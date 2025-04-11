@@ -1,0 +1,153 @@
+name: AICollaborator CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ created ]
+
+# Environment variables used across jobs
+env:
+  SWIFT_VERSION: '6.0'
+  XCODE_VERSION: '16.0'
+  MACOS_VERSION: 'latest'
+
+jobs:
+  # Job for building and testing the Swift package
+  build-and-test:
+    name: Build and Test on macOS
+    runs-on: macos-${{ env.MACOS_VERSION }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Swift
+      uses: fwal/setup-swift@v2
+      with:
+        swift-version: ${{ env.SWIFT_VERSION }}
+        xcode-version: ${{ env.XCODE_VERSION }}
+    
+    - name: Get Swift version
+      run: swift --version
+      
+    - name: Build
+      run: swift build -v
+      
+    - name: Run tests
+      run: swift test -v
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: |
+          .build/debug/AICollaborator
+          .build/debug/*.dylib
+        retention-days: 7
+
+  # Job for running SwiftLint
+  lint:
+    name: SwiftLint
+    runs-on: macos-${{ env.MACOS_VERSION }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install SwiftLint
+      run: brew install swiftlint
+      
+    - name: Run SwiftLint
+      run: swiftlint lint --reporter github-actions-logging
+
+  # Job for generating and publishing documentation
+  documentation:
+    name: Generate Documentation
+    runs-on: macos-${{ env.MACOS_VERSION }}
+    needs: [build-and-test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Swift
+      uses: fwal/setup-swift@v2
+      with:
+        swift-version: ${{ env.SWIFT_VERSION }}
+        xcode-version: ${{ env.XCODE_VERSION }}
+      
+    - name: Build Documentation
+      run: |
+        swift package --allow-writing-to-directory ./docs \
+          generate-documentation --target AICollaborator \
+          --disable-indexing \
+          --transform-for-static-hosting \
+          --hosting-base-path AICollaborator \
+          --output-path ./docs
+      
+    - name: Upload Documentation
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './docs'
+    
+  # Job for deploying documentation (runs only on main branch)
+  deploy-docs:
+    name: Deploy Documentation
+    if: github.ref == 'refs/heads/main'
+    needs: [documentation]
+    runs-on: ubuntu-latest
+    
+    # Grant permissions to deploy to GitHub Pages
+    permissions:
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+
+  # Job for creating releases (runs only on release events)
+  release:
+    name: Create Release
+    if: github.event_name == 'release'
+    needs: [build-and-test, lint, documentation]
+    runs-on: macos-${{ env.MACOS_VERSION }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Swift
+      uses: fwal/setup-swift@v2
+      with:
+        swift-version: ${{ env.SWIFT_VERSION }}
+        xcode-version: ${{ env.XCODE_VERSION }}
+      
+    - name: Build Release Version
+      run: swift build -c release -v
+    
+    - name: Create Release Archive
+      run: |
+        mkdir -p releases
+        cp -r .build/release/AICollaborator releases/
+        cd releases
+        zip -r AICollaborator-${{ github.event.release.tag_name }}.zip AICollaborator
+      
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./releases/AICollaborator-${{ github.event.release.tag_name }}.zip
+        asset_name: AICollaborator-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip
+

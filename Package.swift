@@ -13,27 +13,23 @@ let package = Package(
         .library(
             name: "AICollaborator",
             targets: ["AICollaboratorApp"]),
-        
-        // Command-line tool for AI agent interaction
+        // Command-line tool
         .executable(
             name: "AICollaboratorCLI",
             targets: ["AICollaboratorCLI"])
     ],
     dependencies: [
         // Swift Argument Parser for CLI commands
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
         
         // Networking and API interactions
-        .package(url: "https://github.com/Alamofire/Alamofire", from: "5.9.0"),
+        .package(url: "https://github.com/Alamofire/Alamofire", from: "5.8.0"),
         
         // JSON parsing and manipulation
-        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON", from: "5.0.1"),
-        
-        // Natural language processing utilities
-        .package(url: "https://github.com/apple/swift-nlp", from: "0.5.0"),
+        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON", from: "5.0.0"),
         
         // Async/concurrent utilities
-        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0")
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "0.1.0")
     ],
     targets: [
         // Main application target
@@ -42,8 +38,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "SwiftyJSON", package: "SwiftyJSON"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-                .product(name: "NaturalLanguage", package: "swift-nlp")
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ],
             path: "Sources/AICollaboratorApp",
             resources: [
@@ -65,7 +60,7 @@ let package = Package(
         .testTarget(
             name: "AICollaboratorTests",
             dependencies: ["AICollaboratorApp"],
-            path: "Tests/AICollaboratorTests",
+            path: "Tests",
             resources: [
                 .process("Resources")
             ]
