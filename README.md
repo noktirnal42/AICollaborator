@@ -179,7 +179,7 @@ AICollaborator/
    swift test
    ```
 
-3. Submit a pull request to the `dev` branch
+3. Submit a pull request to the `develop` branch
 
 ### Coding Standards
 
