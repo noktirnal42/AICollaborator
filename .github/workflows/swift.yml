@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-test:
     name: Build and Test
-    runs-on: macos-latest
+    runs-on: macos-13
     
     steps:
     - uses: actions/checkout@v4
@@ -18,28 +18,42 @@ jobs:
       uses: swift-actions/setup-swift@v1
       with:
         swift-version: '6.0'
+      continue-on-error: true
+        
+    # Fallback to latest Swift if 6.0 is not available
+    - name: Set up latest Swift (fallback)
+      if: ${{ failure() }}
+      uses: swift-actions/setup-swift@v1
+      with:
+        swift-version: 'latest'
     
     - name: Show Swift version
       run: swift --version
       
+    - name: Show SDK Path
+      run: xcrun --show-sdk-path
+    
     - name: Build
-      run: swift build -v
+      run: |
+        sdk_path="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.4.sdk"
+        swift build -v -Xswiftc "-sdk" -Xswiftc "$sdk_path" -Xswiftc "-target" -Xswiftc "x86_64-apple-macosx15.4"
       
     - name: Run tests
-      run: swift test -v
+      run: |
+        sdk_path="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.4.sdk"
+        swift test -v -Xswiftc "-sdk" -Xswiftc "$sdk_path" -Xswiftc "-target" -Xswiftc "x86_64-apple-macosx15.4"
   
   swiftlint:
     name: SwiftLint
-    runs-on: macos-latest
+    runs-on: macos-13
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install SwiftLint
-      run: |
-        brew install swiftlint
-        swiftlint --version
-    
+    # The alternative action only works on Linux, so we're removing it
     - name: Run SwiftLint
-      run: swiftlint lint --reporter github-actions-logging
+      run: |
+        swiftlint lint --reporter github-actions-logging --config .swiftlint.yml --strict false
+        # Allow warnings, only fail on errors
+        exit ${PIPESTATUS[0]}
 
