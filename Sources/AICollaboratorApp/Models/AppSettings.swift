@@ -29,24 +29,49 @@ class AppSettings: ObservableObject {
         defaults.set(secondaryModel, forKey: "secondaryModel")
     }
     
-    func loadSettings() {
+    // Load basic settings from UserDefaults
+    private func loadBasicSettings() {
         showLog = defaults.bool(forKey: "showLog")
         autoRefreshEnabled = defaults.bool(forKey: "autoRefreshEnabled")
         refreshInterval = defaults.double(forKey: "refreshInterval")
-        
+    }
+    
+    // Load repository settings from UserDefaults
+    private func loadRepositorySettings() {
         if let repo = defaults.string(forKey: "repository") {
             repository = repo
         }
-        
+    }
+    
+    // Load path settings from UserDefaults
+    private func loadPathSettings() {
         if let pythonPathValue = defaults.string(forKey: "pythonPath") {
             pythonPath = pythonPathValue
         }
-        
+    }
+    
+    // Load model settings from UserDefaults
+    private func loadModelSettings() {
         if let models = defaults.stringArray(forKey: "customOllamaModels") {
             customOllamaModels = models
         }
         
-        if let primary = defaults.string(forKey
+        if let primary = defaults.string(forKey: "primaryModel") {
+            primaryModel = primary
+        }
+        
+        if let secondary = defaults.string(forKey: "secondaryModel") {
+            secondaryModel = secondary
+        }
+    }
+    
+    // Main load function that delegates to helper functions
+    func loadSettings() {
+        loadBasicSettings()
+        loadRepositorySettings()
+        loadPathSettings()
+        loadModelSettings()
+    }
 
 import Foundation
 import SwiftUI

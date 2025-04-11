@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import SwiftyJSON
 import Alamofire
 import AsyncAlgorithms
+import Foundation
 import NaturalLanguage
-
+import SwiftyJSON
 /// Main entry point for AI collaboration functionality
 public actor AICollaborator {
     // MARK: - Properties
@@ -38,10 +38,10 @@ public actor AICollaborator {
     private let githubService: GitHubService
     
     /// Selected Ollama model for AI tasks
-    private(set) public var selectedModel: String?
+    public private(set) var selectedModel: String?
     
     /// Currently active GitHub repository
-    private(set) public var activeRepository: GitHubService.Repository?
+    public private(set) var activeRepository: GitHubService.Repository?
     // MARK: - Initialization
     
     /// Initialize a new AI Collaborator instance
@@ -177,14 +177,14 @@ public struct AICredentials {
 }
 
 /// Simple logging utility
-fileprivate enum LogLevel: Int {
+private enum LogLevel: Int {
     case debug = 0
     case info = 1
     case warning = 2
     case error = 3
 }
 
-fileprivate struct Logger {
+private struct Logger {
     var logLevel: LogLevel = .info
     
     func debug(_ message: String) {
@@ -218,7 +218,7 @@ fileprivate struct Logger {
     }
 }
 
-fileprivate let logger = Logger()
+private let logger = Logger()
 
 /// A queue for managing concurrent task execution
 actor TaskQueue<T> {
@@ -229,7 +229,9 @@ actor TaskQueue<T> {
     }
     
     func dequeue() -> T? {
-        guard !tasks.isEmpty else { return nil }
+        guard !tasks.isEmpty else {
+            return nil
+        }
         return tasks.removeFirst()
     }
     
@@ -241,4 +243,3 @@ actor TaskQueue<T> {
         return tasks.count
     }
 }
-
