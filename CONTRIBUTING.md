@@ -30,7 +30,7 @@ All contributors to this project are expected to respect our [Code of Conduct](C
 
 - **Quality First**: Focus on delivering high-quality, well-tested code
 - **Clarity**: Write clear, self-explanatory code and documentation
-- **Compatibility**: Ensure code works on macOS 15+ with Swift 6
+- **Compatibility**: Ensure code works on macOS 15+ with Swift 6.1
 - **Incremental Changes**: Prefer smaller, focused PRs over large changes
 - **Follow Standards**: Adhere to Swift coding guidelines and project conventions
 
