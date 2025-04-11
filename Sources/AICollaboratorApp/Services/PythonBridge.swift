@@ -468,15 +468,18 @@ class PythonBridge: ObservableObject {
             
             This PR implements several important performance improvements to the audio processing pipeline:
             
-            1. **Buffer Management**: The PR replaces single-use buffers with a buffer pool, significantly reducing memory allocations during audio processing.
+            let filteredMessages = conversationHistory.filter { message in
+                let roleMatches = inRole == nil ? true : message.role == inRole
+                let contentMatches = message.content.localizedCaseInsensitiveContains(searchText)
+                return roleMatches && contentMatches
+            }
             
-            2. **Concurrency Improvements**: The implementation now uses Swift's structured concurrency with async/await patterns to better manage parallel processing tasks.
+            let afterStart = message.timestamp >= startDate
+            let beforeEnd = message.timestamp <= endDate
+            return afterStart && beforeEnd
             
-            3. **Algorithm Optimization**: The FFT algorithm has been optimized by using a more efficient implementation that reduces computational complexity.
-            
-            The changes look well-structured and follow best practices for Swift 6 and macOS 15+. The performance benchmarks included in the PR show a significant improvement (35%) in processing time, which aligns with the code changes observed.
-            
-            One concern is the thread safety of the buffer pool implementation. While the implementation uses actors for thread isolation, there could be potential issues with buffer reuse that might lead to race conditions in edge cases.
+            // Post-process response
+            let processedResponse = postprocessResponse(responseText, for: task)
             
             ## Enhanced Review (deepseek-r1:8b)
             
@@ -488,7 +491,9 @@ class PythonBridge: ObservableObject {
             - Strategic use of new memory management APIs for better buffer handling
             
             **Audio Processing Specific Concerns**:
-            - The buffer pooling strategy could potentially introduce latency during high-demand processing. Consider adding a dynamic scaling mechanism for the pool size based on load.
+            The issue with high frequency crashes appears to be related to improper buffer handling 
+            when processing frequencies above the Nyquist frequency (half the sampling rate). 
+            Here's my proposed solution:
             - The FFT optimization appears to use Apple's Accelerate framework effectively, but consider adding fallbacks for edge cases.
             
             **Memory Management**:
@@ -506,7 +511,9 @@ class PythonBridge: ObservableObject {
             ```
             
             **Performance Testing**:
-            While the PR includes benchmarks showing a 35% improvement, it would be beneficial to include real-world testing scenarios that simulate typical user workloads rather than synthetic benchmarks alone.
+            While the PR includes benchmarks showing a 35% improvement, it would be beneficial to include 
+            real-world testing scenarios that simulate typical user workloads rather than synthetic 
+            benchmarks alone.
             
             ## Next Steps
             
@@ -522,7 +529,9 @@ class PythonBridge: ObservableObject {
             
             ## Initial Solution (llama3.2:latest)
             
-            The issue with high frequency crashes appears to be related to improper buffer handling when processing frequencies above the Nyquist frequency (half the sampling rate). Here's my proposed solution:
+            The issue with high frequency crashes appears to be related to improper buffer handling 
+            when processing frequencies above the Nyquist frequency (half the sampling rate). 
+            Here's my proposed solution:
             
             1. Implement a high-frequency filtering mechanism that safely handles frequencies above 18kHz:
             

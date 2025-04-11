@@ -154,7 +154,7 @@ struct ExecuteCommand: ParsableCommand {
         // Connect to API if key is available
         if let apiKey = AICollaboratorCommand.shared.apiKey {
             let credentials = AICredentials(apiKey: apiKey)
-            let _ = await collaborator.connect(agentType: .llm, credentials: credentials)
+            _ = await collaborator.connect(agentType: .llm, credentials: credentials)
             Logger.shared.info("Connected to AI service with API key")
         } else {
             Logger.shared.warning("No API key provided. Using simulated responses only.")
@@ -183,7 +183,7 @@ struct ExecuteCommand: ParsableCommand {
         )
         
         // Initialize the agent
-        let _ = await simulationAgent.initialize(with: AgentConfiguration())
+        _ = await simulationAgent.initialize(with: AgentConfiguration())
         
         return simulationAgent
     }
@@ -472,4 +472,19 @@ class Logger {
     }
     
     
-
+    func info(_ message: String) {
+        if logLevel <= .info {
+            print("INFO: \(message)")
+        }
+    }
+    
+    func warning(_ message: String) {
+        if logLevel <= .warning {
+            print("WARNING: \(message)")
+        }
+    }
+    
+    func error(_ message: String) {
+        print("ERROR: \(message)")
+    }
+}
