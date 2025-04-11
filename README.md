@@ -5,6 +5,8 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15+-blue.svg)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+📚 **[Complete Documentation Available in the Wiki](https://github.com/noktirnal42/AICollaborator/wiki)**
+
 ## Overview
 
 AI Collaborator is a Swift-based framework designed to facilitate seamless collaboration between AI agents and human users. It provides a structured environment for AI agents to contribute to software development, assist with problem-solving, and automate repetitive tasks.
@@ -127,7 +129,7 @@ collaborator.register(agent: MyAIAgent())
 - `ContextAware`: Protocol for context-aware components
 - `HumanInteractive`: Protocol for human interaction capabilities
 
-For detailed API documentation, see the [API Reference](Documentation/APIReference.md).
+For detailed API documentation, see the [API Reference](https://github.com/noktirnal42/AICollaborator/wiki/API-Reference) in the wiki.
 
 ## Project Structure
 
@@ -186,14 +188,19 @@ AICollaborator/
 - Write unit tests for new functionality
 - Format code using SwiftFormat
 
-## Additional Documentation
+## Documentation
 
-- [Detailed API Reference](Documentation/APIReference.md)
-- [Implementation Guide](Documentation/ImplementationGuide.md)
-- [AI Agent Integration Tutorial](Documentation/AIAgentIntegration.md)
+Our comprehensive documentation is available in the [GitHub Wiki](https://github.com/noktirnal42/AICollaborator/wiki), which includes:
+
+- [Home & Overview](https://github.com/noktirnal42/AICollaborator/wiki/Home)
+- [Installation and Setup](https://github.com/noktirnal42/AICollaborator/wiki/Installation-and-Setup)
+- [API Reference](https://github.com/noktirnal42/AICollaborator/wiki/API-Reference)
+- [Development Guidelines](https://github.com/noktirnal42/AICollaborator/wiki/Development-Guidelines)
+- [AI Agent Integration Guide](https://github.com/noktirnal42/AICollaborator/wiki/AI-Agent-Integration-Guide)
+- [Human-AI Collaboration](https://github.com/noktirnal42/AICollaborator/wiki/Human-AI-Collaboration)
+- [Project Architecture](https://github.com/noktirnal42/AICollaborator/wiki/Project-Architecture)
 - [Contributing Guidelines](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Wiki](https://github.com/noktirnal42/AICollaborator/wiki)
 
 ## License
 

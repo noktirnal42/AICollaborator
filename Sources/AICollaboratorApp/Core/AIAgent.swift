@@ -252,11 +252,11 @@ public enum AgentState: Equatable {
              (.paused, .paused),
              (.shuttingDown, .shuttingDown),
              (.terminated, .terminated):
+             (.terminated, .terminated):
             return true
-        case (.busy(let lhsTaskId), .busy(let rhsTaskId)):
+        case let (.busy(lhsTaskId), .busy(rhsTaskId)):
             return lhsTaskId == rhsTaskId
-        case (.error(let lhsError), .error(let rhsError)):
-            return lhsError == rhsError
+        case let (.error(lhsError), .error(rhsError)):
         default:
             return false
         }

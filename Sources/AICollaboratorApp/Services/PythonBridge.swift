@@ -384,27 +384,79 @@ class PythonBridge: ObservableObject {
         
         // Sample issues
         bridge.issues = [
-            GithubIssue(id: "1", number: 101, title: "Audio module crashes on high frequencies", 
-                        body: "The audio processing module crashes when processing frequencies above 18kHz. The issue occurs consistently when playing audio with frequencies in the 19-22kHz range. We need to implement a proper frequency filtering mechanism that safely handles these high-frequency signals.", 
-                        labels: ["bug", "audio"], updatedAt: "2025-04-09T15:32:00Z", hasAnalysis: true),
-            GithubIssue(id: "2", number: 102, title: "Implement FFT visualization", 
-                        body: "We need to add a real-time FFT visualization component that displays the frequency spectrum of the audio being processed. This should be integrated with the main interface and provide customizable parameters like window size and scaling.", 
-                        labels: ["enhancement", "visualization"], updatedAt: "2025-04-10T09:15:12Z"),
-            GithubIssue(id: "3", number: 103, title: "Memory leak in AudioBuffer class", 
-                        body: "There appears to be a memory leak in the AudioBuffer class when allocating large buffers. The memory isn't properly released when the buffer is no longer needed, leading to gradually increasing memory usage over time.", 
-                        labels: ["bug", "memory", "critical"], updatedAt: "2025-04-10T11:45:30Z")
+            GithubIssue(
+                id: "1", 
+                number: 101, 
+                title: "Audio module crashes on high frequencies", 
+                body: """
+                    The audio processing module crashes when processing frequencies above 18kHz. 
+                    The issue occurs consistently when playing audio with frequencies in the 19-22kHz range. 
+                    We need to implement a proper frequency filtering mechanism that safely handles these high-frequency signals.
+                    """, 
+                labels: ["bug", "audio"], 
+                updatedAt: "2025-04-09T15:32:00Z", 
+                hasAnalysis: true
+            ),
+            GithubIssue(
+                id: "2", 
+                number: 102, 
+                title: "Implement FFT visualization", 
+                body: """
+                    We need to add a real-time FFT visualization component that displays the frequency spectrum of the audio being processed. 
+                    This should be integrated with the main interface and provide customizable parameters like window size and scaling.
+                    """, 
+                labels: ["enhancement", "visualization"], 
+                updatedAt: "2025-04-10T09:15:12Z"
+            ),
+            GithubIssue(
+                id: "3", 
+                number: 103, 
+                title: "Memory leak in AudioBuffer class", 
+                body: """
+                    There appears to be a memory leak in the AudioBuffer class when allocating large buffers. 
+                    The memory isn't properly released when the buffer is no longer needed, leading to gradually increasing memory usage over time.
+                    """, 
+                labels: ["bug", "memory", "critical"], 
+                updatedAt: "2025-04-10T11:45:30Z"
+            )
         ]
         
         // Sample PRs
         bridge.pullRequests = [
-            GithubPR(id: "101", number: 104, title: "Fix audio processing performance issues", 
-                    body: "This PR addresses the performance bottlenecks in the audio processing pipeline. I've optimized the buffer handling code and added better concurrency management to improve throughput. The PR includes comprehensive benchmarks showing a 35% improvement in processing time.", 
-                    branchName: "fix/performance-improvements", updatedAt: "2025-04-08T14:22:00Z", hasAnalysis: true),
-            GithubPR(id: "102", number: 105, title: "Add support for FLAC encoding", 
-                    body: "This PR adds FLAC encoding support to the existing audio exporting functionality. FLAC provides lossless compression while maintaining audio quality. I've integrated the libFLAC library and added appropriate Swift wrappers to make it consistent with our existing API.", 
-                    branchName: "feature/flac-support", updatedAt: "2025-04-09T16:40:21Z"),
-            GithubPR(id: "103", number: 106, title: "Update Swift 6 compatibility", 
-                    body: "This PR updates the codebase to maintain compatibility with Swift 6 and macOS 15+. I've addressed deprecated APIs and adopted new Swift 6 features where appropriate. All tests are passing and the app functions correctly on the latest macOS version.", 
+            GithubPR(
+                id: "101", 
+                number: 104, 
+                title: "Fix audio processing performance issues", 
+                body: """
+                    This PR addresses the performance bottlenecks in the audio processing pipeline. 
+                    I've optimized the buffer handling code and added better concurrency management to improve throughput. 
+                    The PR includes comprehensive benchmarks showing a 35% improvement in processing time.
+                    """, 
+                branchName: "fix/performance-improvements", 
+                updatedAt: "2025-04-08T14:22:00Z", 
+                hasAnalysis: true
+            ),
+            GithubPR(
+                id: "102", 
+                number: 105, 
+                title: "Add support for FLAC encoding", 
+                body: """
+                    This PR adds FLAC encoding support to the existing audio exporting functionality. 
+                    FLAC provides lossless compression while maintaining audio quality. 
+                    I've integrated the libFLAC library and added appropriate Swift wrappers to make it consistent with our existing API.
+                    """, 
+                branchName: "feature/flac-support", 
+                updatedAt: "2025-04-09T16:40:21Z"
+            ),
+            GithubPR(
+                id: "103", 
+                number: 106, 
+                title: "Update Swift 6 compatibility", 
+                body: """
+                    This PR updates the codebase to maintain compatibility with Swift 6 and macOS 15+. 
+                    I've addressed deprecated APIs and adopted new Swift 6 features where appropriate. 
+                    All tests are passing and the app functions correctly on the latest macOS version.
+                    """, 
                     branchName: "maintenance/swift6-update", updatedAt: "2025-04-10T10:05:45Z")
         ]
         
