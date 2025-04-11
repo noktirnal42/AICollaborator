@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-test:
     name: Build and Test
-    runs-on: macos-latest
+    runs-on: macos-13
     
     steps:
     - uses: actions/checkout@v4
@@ -17,20 +17,30 @@ jobs:
     - name: Set up Swift
       uses: swift-actions/setup-swift@v1
       with:
-        swift-version: '6.0'
+        swift-version: '5.9'
     
     - name: Show Swift version
       run: swift --version
+
+    - name: Show Xcode version
+      run: xcodebuild -version
+      
+    - name: Show SDK path
+      run: xcrun --show-sdk-path
       
     - name: Build
-      run: swift build -v
+      run: |
+        sdk_path=$(xcrun --show-sdk-path)
+        swift build -v -Xswiftc "-sdk" -Xswiftc "$sdk_path" -Xswiftc "-target" -Xswiftc "x86_64-apple-macosx10.15"
       
     - name: Run tests
-      run: swift test -v
+      run: |
+        sdk_path=$(xcrun --show-sdk-path)
+        swift test -v -Xswiftc "-sdk" -Xswiftc "$sdk_path" -Xswiftc "-target" -Xswiftc "x86_64-apple-macosx10.15"
   
   swiftlint:
     name: SwiftLint
-    runs-on: macos-latest
+    runs-on: macos-13
     
     steps:
     - uses: actions/checkout@v4
@@ -41,5 +51,12 @@ jobs:
         swiftlint --version
     
     - name: Run SwiftLint
-      run: swiftlint lint --reporter github-actions-logging
+      run: swiftlint lint --reporter github-actions-logging --config .swiftlint.yml
+      
+    # Alternative SwiftLint action if the above fails
+    - name: SwiftLint (alternative)
+      if: failure()
+      uses: norio-nomura/action-swiftlint@3.2.1
+      with:
+        args: --strict
 
