@@ -1,0 +1,114 @@
+# SwiftLint configuration for AICollaborator
+
+# Disabled rules
+disabled_rules:
+  - todo # Allow TODOs for development
+
+# Opt-in rules (enabled on top of default rules)
+opt_in_rules:
+  - closure_spacing
+  - conditional_returns_on_newline
+  - empty_count
+  - explicit_init
+  - fatal_error_message
+  - first_where
+  - modifier_order
+  - nimble_operator
+  - operator_usage_whitespace
+  - overridden_super_call
+  - pattern_matching_keywords
+  - private_outlet
+  - prohibited_super_call
+  - quick_discouraged_call
+  - redundant_nil_coalescing
+  - single_test_class
+  - sorted_imports
+  - vertical_parameter_alignment_on_call
+  - unneeded_parentheses_in_closure_argument
+  - unused_import
+  - unused_private_declaration
+
+# Rule configurations
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+
+file_length:
+  warning: 500
+  error: 800
+
+function_body_length:
+  warning: 60
+  error: 100
+
+type_body_length:
+  warning: 300
+  error: 500
+
+large_tuple:
+  warning: 3
+  error: 5
+  
+nesting:
+  type_level:
+    warning: 3
+    error: 5
+  function_level:
+    warning: 4
+    error: 6
+    
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+trailing_whitespace:
+  ignores_empty_lines: true
+  
+identifier_name:
+  min_length: 
+    warning: 3
+    error: 2
+  excluded:
+    - id
+    - URL
+    - url
+    - URI
+    - uri
+    - as
+    - at
+    - by
+    - or
+    - to
+    - in
+    - if
+    - of
+    - on
+    - up
+    - i
+    - j
+    - k
+    - x
+    - y
+    - z
+
+# Paths to include/exclude when running SwiftLint
+included:
+  - Sources
+  - Tests
+  
+excluded:
+  - .build
+  - Dependencies
+  - Carthage
+  - Pods
+  - DerivedData
+  - "**/*.generated.swift"
+  - "fastlane/**/*"
+  - "*/Frameworks/*"
+  - "*/Resources/*"
+
+# Format of reporter to use when linting
+reporter: "xcode"
+
