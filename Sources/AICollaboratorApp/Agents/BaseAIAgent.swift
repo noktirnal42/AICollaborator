@@ -777,5 +777,308 @@ public actor BaseAIAgent: AICollaboratorAgent {
         } else if code.contains("public class ") && code.contains("void ") && code.contains("new ") {
             return "java"
         } else if code.contains("#include ") && code.contains("int ") && code.contains("return ") {
-            return "c"
         }
+        
+        // Default to "generic" if we can't detect
+        return "generic"
+    }
+    
+    /// Detect the language of a text
+    /// - Parameter text: Text to analyze
+    /// - Returns: Language name
+    private func detectLanguage(_ text: String) -> String {
+        // Use NaturalLanguage framework for language detection
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        
+        // Get the dominant language
+        guard let languageCode = recognizer.dominantLanguage?.rawValue else {
+            return "Unknown"
+        }
+        
+        // Convert language code to readable name
+        switch languageCode {
+        case "en": return "English"
+        case "fr": return "French"
+        case "es": return "Spanish"
+        case "de": return "German"
+        case "it": return "Italian"
+        case "pt": return "Portuguese"
+        case "ru": return "Russian"
+        case "zh": return "Chinese"
+        case "ja": return "Japanese"
+        case "ko": return "Korean"
+        case "ar": return "Arabic"
+        case "hi": return "Hindi"
+        default: return languageCode
+        }
+    }
+    
+    /// Analyze sentiment of a text
+    /// - Parameter text: Text to analyze
+    /// - Returns: Sentiment score (-1.0 to 1.0)
+    private func analyzeSentiment(_ text: String) -> Double {
+        // This is a simple heuristic-based sentiment analyzer
+        // In a real implementation, this would use a more sophisticated model
+        
+        // Positive words increase score
+        let positiveWords = ["good", "great", "excellent", "amazing", "awesome", "fantastic", 
+                            "wonderful", "best", "love", "happy", "positive", "beautiful", 
+                            "perfect", "like", "enjoy", "nice", "helpful", "improved"]
+        
+        // Negative words decrease score
+        let negativeWords = ["bad", "awful", "terrible", "horrible", "worst", "hate", 
+                              "sad", "negative", "ugly", "broken", "dislike", "poor", 
+                              "disappointing", "wrong", "failed", "error", "confusing"]
+        
+        // Intensifiers increase the effect
+        let intensifiers = ["very", "extremely", "incredibly", "absolutely", "really", "highly"]
+        
+        // Negators flip the sentiment
+        let negators = ["not", "no", "never", "don't", "doesn't", "cannot", "can't", "isn't", "aren't", "wasn't", "weren't"]
+        
+        // Convert to lowercase and split into words
+        let words = text.lowercased().split(separator: " ").map { String($0) }
+        
+        var score = 0.0
+        var intensityMultiplier = 1.0
+        var negationActive = false
+        
+        for (index, word) in words.enumerated() {
+            // Clean the word of punctuation
+            let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
+            
+            // Check for intensifiers
+            if intensifiers.contains(cleanWord) {
+                intensityMultiplier = 1.5
+                continue
+            }
+            
+            // Check for negators
+            if negators.contains(cleanWord) {
+                negationActive = true
+                continue
+            }
+            
+            // Check for positive words
+            if positiveWords.contains(cleanWord) {
+                score += 0.1 * intensityMultiplier * (negationActive ? -1 : 1)
+            }
+            
+            // Check for negative words
+            if negativeWords.contains(cleanWord) {
+                score -= 0.1 * intensityMultiplier * (negationActive ? -1 : 1)
+            }
+            
+            // Reset modifiers after applying them
+            intensityMultiplier = 1.0
+            
+            // Reset negation after a few words
+            if negationActive && index > 0 && (index % 3 == 0) {
+                negationActive = false
+            }
+        }
+        
+        // Clamp score to range -1.0 to 1.0
+        return max(-1.0, min(1.0, score))
+    }
+    
+    /// Describe sentiment in words
+    /// - Parameter score: Sentiment score
+    /// - Returns: Description
+    private func describeSentiment(_ score: Double) -> String {
+        if score >= 0.5 {
+            return "Very Positive"
+        } else if score >= 0.2 {
+            return "Positive"
+        } else if score > -0.2 {
+            return "Neutral"
+        } else if score > -0.5 {
+            return "Negative"
+        } else {
+            return "Very Negative"
+        }
+    }
+    
+    /// Record a task result in history
+    /// - Parameter result: The result to record
+    private func recordTaskResult(_ result: AITaskResult) {
+        // Add to history
+        taskHistory[result.taskId] = result
+        
+        // Prune history if needed
+        if taskHistory.count > maxTaskHistoryItems {
+            // Remove oldest items
+            let sortedKeys = taskHistory.keys.sorted { lhs, rhs in
+                guard let lhsResult = taskHistory[lhs], let rhsResult = taskHistory[rhs] else {
+                    return false
+                }
+                return lhsResult.completedAt < rhsResult.completedAt
+            }
+            
+            // Remove oldest entries
+            let keysToRemove = sortedKeys.prefix(taskHistory.count - maxTaskHistoryItems)
+            for key in keysToRemove {
+                taskHistory.removeValue(forKey: key)
+            }
+        }
+    }
+    
+    /// Update the agent state
+    /// - Parameter newState: New state to set
+    private func updateState(_ newState: AgentState) {
+        state = newState
+        logger.info("Agent \(name) state changed to: \(stateDescription(newState))")
+    }
+    
+    /// Get a readable description of an agent state
+    /// - Parameter state: The state to describe
+    /// - Returns: Human-readable description
+    private func stateDescription(_ state: AgentState) -> String {
+        switch state {
+        case .initializing:
+            return "Initializing"
+        case .idle:
+            return "Idle"
+        case .busy(let taskId):
+            return "Busy (Task: \(taskId))"
+        case .paused:
+            return "Paused"
+        case .shuttingDown:
+            return "Shutting Down"
+        case .terminated:
+            return "Terminated"
+        case .error(let message):
+            return "Error: \(message)"
+        }
+    }
+    
+    /// Check if the agent supports all required capabilities
+    /// - Parameter requiredCapabilities: Set of capabilities to check
+    /// - Returns: True if all capabilities are supported
+    private func supportsAllCapabilities(_ requiredCapabilities: Set<AICapability>) -> Bool {
+        return requiredCapabilities.isSubset(of: Set(capabilities))
+    }
+}
+
+// MARK: - Utility Types
+
+/// Monitors progress of a long-running task
+fileprivate class TaskProgressMonitor {
+    /// Task ID
+    let taskId: UUID
+    
+    /// When the task started
+    let startTime: Date
+    
+    /// Current status message
+    private(set) var status: String = "Starting"
+    
+    /// Current progress (0.0 - 1.0)
+    private(set) var progress: Double = 0.0
+    
+    /// Expected duration for the task
+    let expectedDuration: TimeInterval
+    
+    /// Latest update time
+    private(set) var lastUpdateTime: Date
+    
+    /// Elapsed time since task start
+    var elapsedTime: TimeInterval {
+        return Date().timeIntervalSince(startTime)
+    }
+    
+    /// Estimated time remaining
+    var estimatedTimeRemaining: TimeInterval {
+        if progress >= 0.99 {
+            return 0
+        }
+        
+        let timeElapsed = elapsedTime
+        if progress > 0.05 {
+            // Calculate based on current progress
+            return timeElapsed * (1.0 - progress) / progress
+        } else {
+            // Fall back to expected duration if progress is too small
+            return max(0, expectedDuration - timeElapsed)
+        }
+    }
+    
+    /// Initialize a new task progress monitor
+    /// - Parameters:
+    ///   - taskId: Task ID to monitor
+    ///   - startTime: When the task started
+    ///   - expectedDuration: Expected duration for the task
+    init(taskId: UUID, startTime: Date, expectedDuration: TimeInterval) {
+        self.taskId = taskId
+        self.startTime = startTime
+        self.expectedDuration = expectedDuration
+        self.lastUpdateTime = startTime
+    }
+    
+    /// Update the progress
+    /// - Parameters:
+    ///   - status: New status message
+    ///   - progress: New progress value (0.0 - 1.0)
+    func updateProgress(status: String, progress: Double) {
+        self.status = status
+        self.progress = max(0.0, min(1.0, progress))
+        self.lastUpdateTime = Date()
+    }
+}
+
+/// Logger for agent operations
+fileprivate struct AgentLogger {
+    /// Log a debug message
+    /// - Parameter message: Message to log
+    func debug(_ message: String) {
+        log(message, level: .debug)
+    }
+    
+    /// Log an info message
+    /// - Parameter message: Message to log
+    func info(_ message: String) {
+        log(message, level: .info)
+    }
+    
+    /// Log a warning message
+    /// - Parameter message: Message to log
+    func warning(_ message: String) {
+        log(message, level: .warning)
+    }
+    
+    /// Log an error message
+    /// - Parameter message: Message to log
+    func error(_ message: String) {
+        log(message, level: .error)
+    }
+    
+    /// Log a message with a specific level
+    /// - Parameters:
+    ///   - message: Message to log
+    ///   - level: Log level
+    private func log(_ message: String, level: LogLevel) {
+        let prefix: String
+        switch level {
+        case .debug:
+            prefix = "[DEBUG]"
+        case .info:
+            prefix = "[INFO]"
+        case .warning:
+            prefix = "[WARNING]"
+        case .error:
+            prefix = "[ERROR]"
+        }
+        
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        print("\(timestamp) \(prefix) [Agent] \(message)")
+    }
+    
+    /// Log levels
+    enum LogLevel {
+        case debug
+        case info
+        case warning
+        case error
+    }
+}
