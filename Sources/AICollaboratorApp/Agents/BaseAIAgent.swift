@@ -434,5 +434,348 @@ public actor BaseAIAgent: AICollaboratorAgent {
             if now.timeIntervalSince(lastProgressUpdate) >= progressUpdateInterval {
                 let progress = min(0.9, 0.3 + Double(responseText.count) / 1000.0)
                 progressMonitors[task.taskId]?.updateProgress(
-                    status: "
-
+                    status: "Generating response",
+                    progress: progress
+                )
+                lastProgressUpdate = now
+            }
+        }
+        
+        // Post-process the response if needed
+        let processedResponse = postprocessResponse(responseText, for: task)
+        
+        // Create and return the task result
+        return AITaskResult(
+            taskId: task.taskId,
+            status: .completed,
+            output: processedResponse,
+            completedAt: Date(),
+            executionTime: progressMonitors[task.taskId]?.elapsedTime
+        )
+    }
+    
+    /// Fallback processing when Ollama is not available
+    /// - Parameter task: The task to process
+    /// - Returns: Task result
+    private func fallbackProcessing(_ task: AITask) async throws -> AITaskResult {
+        logger.info("Using fallback processing for task: \(task.description)")
+        
+        // Update progress
+        progressMonitors[task.taskId]?.updateProgress(status: "Preparing response", progress: 0.5)
+        
+        // Simulate processing time based on task complexity
+        let processingTime = calculateProcessingTime(for: task)
+        try await Task.sleep(for: .seconds(processingTime))
+        
+        // Generate a basic response based on the task type
+        let response: String
+        
+        switch true {
+        case task.requiredCapabilities.contains(.codeGeneration):
+            response = generateFallbackCodeResponse(for: task)
+        case task.requiredCapabilities.contains(.textAnalysis):
+            response = generateFallbackAnalysisResponse(for: task)
+        case task.requiredCapabilities.contains(.conversational):
+            response = generateFallbackConversationResponse(for: task)
+        default:
+            response = """
+            I've processed your request: "\(task.description)"
+            
+            This is a fallback response as the requested AI model is not available.
+            For full functionality, please ensure Ollama is running with appropriate models.
+            
+            Your query: \(task.query)
+            """
+        }
+        
+        // Update progress to complete
+        progressMonitors[task.taskId]?.updateProgress(status: "Completed", progress: 1.0)
+        
+        // Return the result
+        return AITaskResult(
+            taskId: task.taskId,
+            status: .completed,
+            output: response,
+            completedAt: Date(),
+            executionTime: progressMonitors[task.taskId]?.elapsedTime
+        )
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Preprocess a task before execution
+    /// - Parameter task: The task to preprocess
+    /// - Returns: Preprocessed task
+    private func preprocessTask(_ task: AITask) async throws -> AITask {
+        logger.debug("Preprocessing task: \(task.taskId)")
+        
+        // Perform common preprocessing steps
+        var processedTask = task
+        
+        // Example: Add timestamp to context
+        var updatedContext = task.context
+        updatedContext["preprocessTimestamp"] = Date().timeIntervalSince1970
+        
+        // Example: Enhance prompt based on capabilities
+        var enhancedQuery = task.query
+        
+        // Add special instructions for code tasks
+        if task.requiredCapabilities.contains(.codeGeneration) && 
+           !enhancedQuery.lowercased().contains("code") {
+            enhancedQuery = "Generate code for: \(enhancedQuery)"
+        }
+        
+        // Create updated task
+        processedTask = AITask(
+            description: task.description,
+            query: enhancedQuery,
+            context: updatedContext,
+            requiredCapabilities: task.requiredCapabilities,
+            priority: task.priority,
+            timeout: task.timeout,
+            createdBy: task.createdBy
+        )
+        
+        return processedTask
+    }
+    
+    /// Post-process a response after generation
+    /// - Parameters:
+    ///   - response: Raw response text
+    ///   - task: Original task
+    /// - Returns: Processed response
+    private func postprocessResponse(_ response: String, for task: AITask) -> String {
+        // Clean up response if needed
+        var processedResponse = response
+        
+        // Remove any unnecessary prefixes
+        if processedResponse.hasPrefix("Assistant: ") {
+            processedResponse = String(processedResponse.dropFirst(11))
+        }
+        
+        // Trim whitespace
+        processedResponse = processedResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Add task-specific formatting
+        if task.requiredCapabilities.contains(.codeGeneration) {
+            // Ensure code blocks are properly formatted
+            if !processedResponse.contains("```") {
+                // Try to detect language
+                let language = inferCodeLanguage(from: processedResponse, context: task.context)
+                processedResponse = "```\(language)\n\(processedResponse)\n```"
+            }
+        }
+        
+        return processedResponse
+    }
+    
+    /// Generate a fallback code response
+    /// - Parameter task: The task to generate code for
+    /// - Returns: Generated code response
+    private func generateFallbackCodeResponse(for task: AITask) -> String {
+        // Determine language from context if available
+        let language = task.context["language"] as? String ?? "python"
+        
+        // Generate a simple code example
+        switch language.lowercased() {
+        case "swift":
+            return """
+            ```swift
+            // Example Swift implementation
+            struct ExampleImplementation {
+                // Properties
+                let name: String
+                let value: Int
+                
+                // Methods
+                func process() -> String {
+                    return "Processed: \\(name) with value \\(value)"
+                }
+                
+                // Example usage
+                static func example() {
+                    let example = ExampleImplementation(name: "Test", value: 42)
+                    print(example.process())
+                }
+            }
+            ```
+            
+            This is a fallback implementation. Please provide specific requirements for a more accurate solution.
+            """
+        case "python":
+            return """
+            ```python
+            # Example Python implementation
+            class ExampleImplementation:
+                def __init__(self, name, value):
+                    self.name = name
+                    self.value = value
+                    
+                def process(self):
+                    return f"Processed: {self.name} with value {self.value}"
+                
+                @staticmethod
+                def example():
+                    example = ExampleImplementation("Test", 42)
+                    print(example.process())
+                    
+            # Usage
+            if __name__ == "__main__":
+                ExampleImplementation.example()
+            ```
+            
+            This is a fallback implementation. Please provide specific requirements for a more accurate solution.
+            """
+        default:
+            return """
+            ```
+            // Example implementation
+            function process(name, value) {
+                return `Processed: ${name} with value ${value}`;
+            }
+            
+            // Usage
+            console.log(process("Test", 42));
+            ```
+            
+            This is a fallback implementation. Please provide specific requirements for a more accurate solution.
+            """
+        }
+    }
+    
+    /// Generate a fallback analysis response
+    /// - Parameter task: The task to generate analysis for
+    /// - Returns: Generated analysis response
+    private func generateFallbackAnalysisResponse(for task: AITask) -> String {
+        // Extract text to analyze if available
+        let textToAnalyze = task.context["text"] as? String ?? task.query
+        
+        // Perform basic analysis
+        let language = detectLanguage(textToAnalyze)
+        let sentiment = analyzeSentiment(textToAnalyze)
+        let wordCount = textToAnalyze.split(separator: " ").count
+        
+        return """
+        ## Text Analysis Results
+        
+        **Basic Metrics:**
+        - Word count: \(wordCount)
+        - Detected language: \(language)
+        - Sentiment score: \(sentiment) (\(describeSentiment(sentiment)))
+        
+        **Summary:**
+        This is a \(wordCount < 100 ? "short" : "longer") text in \(language) with a generally \(describeSentiment(sentiment).lowercased()) tone.
+        
+        Note: This is a fallback analysis. For more comprehensive analysis, please ensure an appropriate AI model is available.
+        """
+    }
+    
+    /// Generate a fallback conversation response
+    /// - Parameter task: The conversational task
+    /// - Returns: Generated conversation response
+    private func generateFallbackConversationResponse(for task: AITask) -> String {
+        // Extract query
+        let query = task.query
+        
+        // Generate a simple response based on detected intent
+        if query.lowercased().contains("hello") || query.lowercased().contains("hi") {
+            return "Hello! I'm an AI assistant. How can I help you today?"
+        } else if query.lowercased().contains("help") {
+            return """
+            I can help you with various tasks, including:
+            - Answering questions
+            - Generating code examples
+            - Analyzing text
+            - Having conversations
+            
+            What would you like assistance with?
+            """
+        } else if query.lowercased().contains("thank") {
+            return "You're welcome! Is there anything else I can help you with?"
+        } else {
+            return """
+            I've received your message. This is a fallback response since I'm currently operating in limited mode.
+            
+            For full conversational capabilities, please ensure an appropriate AI model is configured.
+            
+            How else can I assist you today?
+            """
+        }
+    }
+    
+    /// Calculate expected duration for a task
+    /// - Parameter task: The task to calculate for
+    /// - Returns: Expected duration in seconds
+    private func calculateExpectedDuration(for task: AITask) -> TimeInterval {
+        // Base duration depends on priority
+        var baseDuration: TimeInterval
+        switch task.priority {
+        case .critical:
+            baseDuration = 5.0
+        case .high:
+            baseDuration = 10.0
+        case .normal:
+            baseDuration = 15.0
+        case .low:
+            baseDuration = 20.0
+        }
+        
+        // Adjust for task complexity based on required capabilities
+        if task.requiredCapabilities.contains(.codeGeneration) {
+            baseDuration *= 1.5
+        }
+        
+        if task.requiredCapabilities.contains(.textAnalysis) {
+            baseDuration *= 1.2
+        }
+        
+        // Adjust for query length
+        let queryLength = task.query.count
+        let lengthFactor = 1.0 + Double(min(queryLength, 1000)) / 1000.0
+        
+        return baseDuration * lengthFactor
+    }
+    
+    /// Calculate processing time for fallback responses
+    /// - Parameter task: The task to calculate for
+    /// - Returns: Processing time in seconds
+    private func calculateProcessingTime(for task: AITask) -> TimeInterval {
+        // Simulate varying processing times based on task complexity
+        var baseTime: TimeInterval = 1.0
+        
+        // Adjust for task type
+        if task.requiredCapabilities.contains(.codeGeneration) {
+            baseTime += 1.5
+        } else if task.requiredCapabilities.contains(.textAnalysis) {
+            baseTime += 1.0
+        }
+        
+        // Add some randomness
+        baseTime += Double.random(in: 0.5...1.5)
+        
+        return baseTime
+    }
+    
+    /// Infer the programming language from code snippet
+    /// - Parameters:
+    ///   - code: Code snippet
+    ///   - context: Task context
+    /// - Returns: Inferred language name
+    private func inferCodeLanguage(from code: String, context: [String: Any]) -> String {
+        // First check if language is specified in context
+        if let language = context["language"] as? String {
+            return language
+        }
+        
+        // Basic language detection based on syntax patterns
+        if code.contains("func ") && code.contains("let ") && code.contains("var ") {
+            return "swift"
+        } else if code.contains("def ") && code.contains("import ") && (code.contains("self") || code.contains("class ")){
+            return "python"
+        } else if code.contains("function ") && code.contains("const ") && code.contains("let ") {
+            return "javascript"
+        } else if code.contains("public class ") && code.contains("void ") && code.contains("new ") {
+            return "java"
+        } else if code.contains("#include ") && code.contains("int ") && code.contains("return ") {
+            return "c"
+        }
