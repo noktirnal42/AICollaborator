@@ -1,7 +1,7 @@
 <p align="center"><img src="Sources/Resources/assets/images/AICollaborator_logo.png" alt="AICollaborator Logo" width="300"/></p>
 <h1 align="center">AI Collaborator</h1>
 
-[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
+[![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange.svg)](https://swift.org)
 [![macOS 15+](https://img.shields.io/badge/macOS-15+-blue.svg)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -26,7 +26,7 @@ AI Collaborator is a Swift-based framework designed to facilitate seamless colla
 
 - macOS 15.0+
 - Xcode 16.0+
-- Swift 6.0
+- Swift 5.9
 
 ### Using Swift Package Manager
 
