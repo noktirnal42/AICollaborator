@@ -32,7 +32,7 @@ extension AnalysisResult {
         let secondaryStartIndex = content.distance(from: content.startIndex, to: secondaryRange.lowerBound)
         let primaryText = content[primaryRange...]
         
-        if let endIndex = primaryText.firstIndex(where: { $0 == '#' }) {
+        if let endIndex = primaryText.firstIndex(where: { $0 == "#" }) {
             return String(primaryText[..<endIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
         } else if secondaryStartIndex > 0 {
             let endIndex = content.index(content.startIndex, offsetBy: secondaryStartIndex - 1)

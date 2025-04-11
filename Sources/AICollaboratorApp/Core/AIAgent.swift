@@ -6,6 +6,278 @@
 //
 
 import Foundation
+
+/// Protocol defining the interface for all AI agents in the AICollaborator framework.
+///
+/// AI agents are responsible for executing tasks and processing information within
+/// the AICollaborator framework. They can have different capabilities and specializations,
+/// but all conform to this common interface.
+@available(macOS 15.0, *)
+public protocol AIAgent {
+    
+    // MARK: - Required Methods
+    
+    /// Execute a task within the given context.
+    ///
+    /// - Parameters:
+    ///   - task: The task to execute.
+    ///   - context: The context in which to execute the task.
+    /// - Returns: The result of the task execution.
+    /// - Throws: Errors encountered during task execution.
+    func execute(task: AITask, in context: AIContext) async throws -> AITaskResult
+    
+    /// Get the agent's capabilities.
+    ///
+    /// - Returns: Array of capabilities supported by this agent.
+    func capabilities() -> [AICapability]
+    
+    /// Check if the agent can execute a specific task.
+    ///
+    /// - Parameter task: The task to check.
+    /// - Returns: `true` if the agent can execute the task.
+    func canExecute(task: AITask) -> Bool
+    
+    // MARK: - Optional Methods
+    
+    /// Get the agent's configuration.
+    ///
+    /// - Returns: The agent's configuration.
+    func configuration() -> AIAgentConfiguration
+    
+    /// Update the agent's configuration.
+    ///
+    /// - Parameter configuration: The new configuration.
+    /// - Returns: `true` if the configuration was updated successfully.
+    @discardableResult
+    func updateConfiguration(_ configuration: AIAgentConfiguration) -> Bool
+    
+    /// Prepare the agent for task execution.
+    ///
+    /// This method is called before a task is executed, allowing the agent
+    /// to prepare resources or initialize state.
+    ///
+    /// - Parameter task: The task that will be executed.
+    /// - Returns: `true` if preparation was successful.
+    func prepare(for task: AITask) async -> Bool
+    
+    /// Clean up after task execution.
+    ///
+    /// This method is called after a task has been executed, allowing the agent
+    /// to release resources or clean up state.
+    ///
+    /// - Parameters:
+    ///   - task: The executed task.
+    ///   - result: The result of the task execution.
+    func cleanup(after task: AITask, result: AITaskResult) async
+}
+
+/// Extension providing default implementations of optional methods.
+@available(macOS 15.0, *)
+public extension AIAgent {
+    
+    func configuration() -> AIAgentConfiguration {
+        return AIAgentConfiguration()
+    }
+    
+    @discardableResult
+    func updateConfiguration(_ configuration: AIAgentConfiguration) -> Bool {
+        // Default implementation does nothing
+        return true
+    }
+    
+    func prepare(for task: AITask) async -> Bool {
+        // Default implementation does nothing
+        return true
+    }
+    
+    func cleanup(after task: AITask, result: AITaskResult) async {
+        // Default implementation does nothing
+    }
+    
+    func canExecute(task: AITask) -> Bool {
+        // Check if agent has all required capabilities for the task
+        let agentCapabilities = Set(capabilities())
+        return task.requiredCapabilities.isSubset(of: agentCapabilities)
+    }
+}
+
+/// Configuration for AI agents.
+@available(macOS 15.0, *)
+public struct AIAgentConfiguration: Codable {
+    
+    /// Maximum number of concurrent tasks the agent can execute.
+    public var maxConcurrentTasks: Int
+    
+    /// Model or version to use for the agent.
+    public var model: String?
+    
+    /// API endpoint for external service if applicable.
+    public var apiEndpoint: URL?
+    
+    /// Additional parameters for the agent.
+    public var parameters: [String: String]
+    
+    /// Temperature parameter for controlling randomness (0.0-1.0).
+    public var temperature: Double?
+    
+    /// Maximum tokens to generate.
+    public var maxTokens: Int?
+    
+    /// Timeout for task execution in seconds.
+    public var timeoutSeconds: Double
+    
+    /// Creates a new agent configuration.
+    ///
+    /// - Parameters:
+    ///   - maxConcurrentTasks: Maximum number of concurrent tasks.
+    ///   - model: Model or version to use.
+    ///   - apiEndpoint: API endpoint for external service.
+    ///   - parameters: Additional parameters.
+    ///   - temperature: Temperature parameter (0.0-1.0).
+    ///   - maxTokens: Maximum tokens to generate.
+    ///   - timeoutSeconds: Timeout for task execution.
+    public init(
+        maxConcurrentTasks: Int = 1,
+        model: String? = nil,
+        apiEndpoint: URL? = nil,
+        parameters: [String: String] = [:],
+        temperature: Double? = nil,
+        maxTokens: Int? = nil,
+        timeoutSeconds: Double = 30.0
+    ) {
+        self.maxConcurrentTasks = maxConcurrentTasks
+        self.model = model
+        self.apiEndpoint = apiEndpoint
+        self.parameters = parameters
+        self.temperature = temperature
+        self.maxTokens = maxTokens
+        self.timeoutSeconds = timeoutSeconds
+    }
+}
+
+/// Protocol for AI agents that can collaborate with the AICollaborator framework.
+@available(macOS 15.0, *)
+public protocol AICollaboratorAgent {
+    
+    /// Process a task assigned to this agent.
+    ///
+    /// - Parameter task: The task to process.
+    /// - Returns: The result of the task processing.
+    /// - Throws: Errors encountered during task processing.
+    func processTask(_ task: AITask) async throws -> AITaskResult
+    
+    /// Provide the capabilities of this agent.
+    ///
+    /// - Returns: Array of capabilities supported by this agent.
+    func provideCapabilities() -> [AICapability]
+}
+
+/// Identifier for registered AI agents.
+public struct AIAgentExchangeId: Hashable, Codable {
+    
+    /// Unique identifier for the agent exchange.
+    private let id: UUID
+    
+    /// Creates a new agent exchange ID.
+    public init() {
+        self.id = UUID()
+    }
+    
+    /// Creates an agent exchange ID from a string representation.
+    ///
+    /// - Parameter string: String representation of an agent exchange ID.
+    /// - Throws: Error if the string cannot be converted to a UUID.
+    public init(_ string: String) throws {
+        guard let uuid = UUID(uuidString: string) else {
+            throw AICollaboratorError.invalidAgentId
+        }
+        self.id = uuid
+    }
+}
+
+/// Error types for the AICollaborator framework.
+public enum AICollaboratorError: Error {
+    case taskExecutionFailed(String)
+    case agentNotFound(name: String)
+    case invalidAgentId
+    case invalidTaskInput
+    case invalidConfiguration
+    case serviceUnavailable
+    case authenticationFailed
+    case timeout
+    case unsupportedOperation
+}
+
+/// Status of task execution.
+public enum TaskResultStatus: String, Codable {
+    case completed
+    case failed
+    case partial
+    case cancelled
+    case timeout
+}
+
+/// Resource usage statistics.
+public struct ResourceUsage: Codable {
+    /// Tokens used for input.
+    public let inputTokens: Int?
+    
+    /// Tokens used for output.
+    public let outputTokens: Int?
+    
+    /// Total tokens used.
+    public let totalTokens: Int?
+    
+    /// CPU usage percentage.
+    public let cpuUsage: Double?
+    
+    /// Memory usage in megabytes.
+    public let memoryUsageMB: Double?
+    
+    /// Creates a new resource usage statistics object.
+    ///
+    /// - Parameters:
+    ///   - inputTokens: Tokens used for input.
+    ///   - outputTokens: Tokens used for output.
+    ///   - totalTokens: Total tokens used.
+    ///   - cpuUsage: CPU usage percentage.
+    ///   - memoryUsageMB: Memory usage in megabytes.
+    public init(
+        inputTokens: Int? = nil,
+        outputTokens: Int? = nil,
+        totalTokens: Int? = nil,
+        cpuUsage: Double? = nil,
+        memoryUsageMB: Double? = nil
+    ) {
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0)
+        self.cpuUsage = cpuUsage
+        self.memoryUsageMB = memoryUsageMB
+    }
+}
+
+/// A type that can be encoded to any Codable type.
+struct AnyEncodable: Encodable {
+    private let _encode: (Encoder) throws -> Void
+    
+    public init<T: Encodable>(_ value: T) {
+        _encode = value.encode
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        try _encode(encoder)
+    }
+}
+
+//
+//  AIAgent.swift
+//  AICollaborator
+//
+//  Created: 2025-04-10
+//
+
+import Foundation
 import SwiftyJSON
 import Alamofire
 

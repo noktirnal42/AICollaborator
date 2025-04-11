@@ -6,6 +6,194 @@
 //
 
 import Foundation
+import Alamofire
+import AsyncAlgorithms
+
+/// Base implementation of the AIAgent protocol.
+///
+/// `BaseAIAgent` provides a foundation for building custom AI agents by
+/// implementing common functionality that most agents will need. Custom
+/// agents can inherit from this class and override methods as needed.
+@available(macOS 15.0, *)
+open class BaseAIAgent: AIAgent {
+    
+    // MARK: - Properties
+    
+    /// Configuration for this agent.
+    private var agentConfiguration: AIAgentConfiguration
+    
+    /// Queue for managing concurrent task execution.
+    private let taskQueue = TaskQueue()
+    
+    /// Capabilities supported by this agent.
+    private let agentCapabilities: [AICapability]
+    
+    /// Logger for agent operations.
+    internal let logger = Logger(category: "BaseAIAgent")
+    
+    // MARK: - Initialization
+    
+    /// Initialize a new base AI agent.
+    ///
+    /// - Parameters:
+    ///   - capabilities: Array of capabilities supported by this agent.
+    ///   - configuration: Configuration for this agent.
+    public init(
+        capabilities: [AICapability],
+        configuration: AIAgentConfiguration = AIAgentConfiguration()
+    ) {
+        self.agentCapabilities = capabilities
+        self.agentConfiguration = configuration
+    }
+    
+    // MARK: - AIAgent Protocol Implementation
+    
+    /// Execute a task within the given context.
+    ///
+    /// This base implementation handles common pre- and post-processing steps,
+    /// and delegates the actual task execution to the `performTask` method,
+    /// which subclasses should override.
+    ///
+    /// - Parameters:
+    ///   - task: The task to execute.
+    ///   - context: The context in which to execute the task.
+    /// - Returns: The result of the task execution.
+    /// - Throws: Errors encountered during task execution.
+    open func execute(task: AITask, in context: AIContext) async throws -> AITaskResult {
+        logger.info("Executing task: \(task.taskId)")
+        
+        // Check if agent can execute the task
+        guard canExecute(task: task) else {
+            throw AICollaboratorError.unsupportedOperation
+        }
+        
+        // Prepare for task execution
+        guard await prepare(for: task) else {
+            throw AICollaboratorError.taskExecutionFailed("Failed to prepare for task execution")
+        }
+        
+        // Track execution time
+        let startTime = Date()
+        
+        do {
+            // Execute the task with timeout
+            let result = try await withTimeout(seconds: agentConfiguration.timeoutSeconds) {
+                try await self.performTask(task: task, in: context)
+            }
+            
+            // Calculate execution duration
+            let endTime = Date()
+            let executionDuration = endTime.timeIntervalSince(startTime)
+            
+            // Create the final result with execution metrics
+            let finalResult = AITaskResult(
+                resultId: result.resultId,
+                taskId: task.taskId,
+                status: result.status,
+                output: result.output,
+                error: result.error,
+                completedAt: endTime,
+                executionDuration: executionDuration,
+                resourceUsage: result.resourceUsage,
+                metadata: result.metadata
+            )
+            
+            // Clean up after execution
+            await cleanup(after: task, result: finalResult)
+            
+            logger.info("Task completed in \(executionDuration) seconds: \(task.taskId)")
+            return finalResult
+            
+        } catch let error as AICollaboratorError where error == .timeout {
+            // Handle timeout
+            logger.error("Task timed out: \(task.taskId)")
+            
+            let timeoutResult = AITaskResult(
+                resultId: UUID(),
+                taskId: task.taskId,
+                status: .timeout,
+                error: "Task execution timed out after \(agentConfiguration.timeoutSeconds) seconds",
+                completedAt: Date()
+            )
+            
+            await cleanup(after: task, result: timeoutResult)
+            return timeoutResult
+            
+        } catch {
+            // Handle other errors
+            logger.error("Task failed: \(task.taskId) - \(error.localizedDescription)")
+            
+            let errorResult = AITaskResult(
+                resultId: UUID(),
+                taskId: task.taskId,
+                status: .failed,
+                error: error.localizedDescription,
+                completedAt: Date()
+            )
+            
+            await cleanup(after: task, result: errorResult)
+            return errorResult
+        }
+    }
+    
+    /// Get the agent's capabilities.
+    ///
+    /// - Returns: Array of capabilities supported by this agent.
+    open func capabilities() -> [AICapability] {
+        return agentCapabilities
+    }
+    
+    /// Get the agent's configuration.
+    ///
+    /// - Returns: The agent's configuration.
+    open func configuration() -> AIAgentConfiguration {
+        return agentConfiguration
+    }
+    
+    /// Update the agent's configuration.
+    ///
+    /// - Parameter configuration: The new configuration.
+    /// - Returns: `true` if the configuration was updated successfully.
+    @discardableResult
+    open func updateConfiguration(_ configuration: AIAgentConfiguration) -> Bool {
+        self.agentConfiguration = configuration
+        return true
+    }
+    
+    // MARK: - Methods to Override
+    
+    /// Perform the actual task execution.
+    ///
+    /// Subclasses must override this method to implement their specific task execution logic.
+    ///
+    /// - Parameters:
+    ///   - task: The task to execute.
+    ///   - context: The context in which to execute the task.
+    /// - Returns: The result of the task execution.
+    /// - Throws: Errors encountered during task execution.
+    open func performTask(task: AITask, in context: AIContext) async throws -> AITaskResult {
+        // Default implementation throws an error
+        // Subclasses must override this method
+        throw AICollaboratorError.unsupportedOperation
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Execute a task with a timeout.
+    ///
+    /// - Parameters:
+    ///   - seconds: Timeout duration in seconds.
+    ///   - task: The task to execute.
+    /// - Returns
+
+//
+//  BaseAIAgent.swift
+//  AICollaborator
+//
+//  Created: 2025-04-10
+//
+
+import Foundation
 import NaturalLanguage
 import SwiftyJSON
 

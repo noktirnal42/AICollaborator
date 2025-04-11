@@ -6,6 +6,292 @@
 //
 
 import Foundation
+import AICollaboratorApp
+import ArgumentParser
+
+// MARK: - Main CLI Command
+
+/// AICollaborator Command Line Interface
+struct AICollaboratorCommand: ParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "ai-collaborator",
+        abstract: "Interact with the AICollaborator framework",
+        subcommands: [GenerateText.self, ListCapabilities.self, Help.self],
+        defaultSubcommand: Help.self
+    )
+}
+
+// MARK: - Subcommands
+
+/// Generate text using AICollaborator
+struct GenerateText: ParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "generate",
+        abstract: "Generate text using AI"
+    )
+    
+    @Argument(help: "The prompt to generate text from")
+    var prompt: String
+    
+    @Option(name: .shortAndLong, help: "Maximum number of tokens to generate")
+    var maxTokens: Int = 500
+    
+    @Option(name: .shortAndLong, help: "Temperature (randomness) setting")
+    var temperature: Double = 0.7
+    
+    @Option(name: .long, help: "Ollama model to use")
+    var model: String?
+    
+    func run() throws {
+        print("🤖 AICollaborator CLI 📝")
+        print("Initializing AICollaborator...")
+        
+        // Initialize configuration
+        let configParams: [String: String] = model != nil ? ["model": model!] : [:]
+        let config = AgentConfiguration(
+            maxTokens: maxTokens,
+            temperature: temperature,
+            modelId: model,
+            additionalParams: configParams
+        )
+        
+        // Create task spinner for better UX
+        let spinner = Spinner()
+        
+        do {
+            // Initialize the AICollaborator
+            print("🔄 Setting up AI environment...")
+            let collaborator = AICollaborator()
+            
+            // Register default agent
+            let agent = BaseAIAgent(
+                name: "TextGenerator",
+                version: "1.0.0",
+                description: "Default text generation agent",
+                capabilities: [.textGeneration, .conversational],
+                configuration: config
+            )
+            
+            // Create text generation task
+            let task = AITask(
+                description: "Generate text from prompt",
+                query: prompt,
+                input: .text(prompt),
+                requiredCapabilities: [.textGeneration],
+                parameters: ["maxTokens": "\(maxTokens)"]
+            )
+            
+            print("✨ Prompt: \"\(prompt)\"")
+            print("⚙️  Generating with settings: maxTokens=\(maxTokens), temperature=\(temperature)")
+            
+            // Execute task (with placeholder for actual execution)
+            spinner.start(message: "Generating response")
+            
+            // In a real implementation, this would actually execute the task
+            // For now, we're simulating the execution
+            let result = try await simulateTaskExecution(collaborator: collaborator, agent: agent, task: task)
+            
+            spinner.stop()
+            
+            // Output result
+            if let output = result.output as? String {
+                print("\n📝 Generated Response:")
+                print("====================")
+                print(output)
+                print("====================")
+                
+                if let executionTime = result.executionTime {
+                    print("⏱️  Generated in \(String(format: "%.2f", executionTime)) seconds")
+                }
+            } else {
+                print("\n⚠️  Response format not as expected")
+            }
+            
+        } catch let error as AgentError {
+            spinner.stop()
+            printError("Agent error: \(formatError(error))")
+            throw ExitCode(1)
+        } catch {
+            spinner.stop()
+            printError("Unexpected error: \(error.localizedDescription)")
+            throw ExitCode(1)
+        }
+    }
+    
+    /// Simulate task execution (placeholder)
+    private func simulateTaskExecution(
+        collaborator: AICollaborator,
+        agent: BaseAIAgent,
+        task: AITask
+    ) async throws -> AITaskResult {
+        // Simulate processing time
+        try await Task.sleep(for: .seconds(1.5))
+        
+        // Simulate a response based on the prompt
+        let prompt = task.query
+        let output: String
+        
+        if prompt.lowercased().contains("hello") || prompt.lowercased().contains("hi") {
+            output = "Hello! I'm an AI assistant from the AICollaborator framework. How can I help you today?"
+        } else if prompt.lowercased().contains("help") {
+            output = """
+            I can assist with various tasks including:
+            - Answering questions
+            - Generating creative content
+            - Summarizing information
+            - Writing code examples
+            
+            This is a simulated response in the example application.
+            In a full implementation, responses would be generated by the selected AI model.
+            """
+        } else {
+            output = """
+            Based on your prompt: "\(prompt)"
+            
+            This is a simulated response from the AICollaborator example application.
+            In a full implementation, this text would be generated by the AI model you selected.
+            
+            The AICollaborator framework provides a flexible system for working with various
+            AI models and capabilities. You can extend this example by implementing custom agents,
+            adding new capabilities, or integrating with different AI providers.
+            
+            To learn more, check out the documentation and examples in the repository.
+            """
+        }
+        
+        // Return a simulated result
+        return AITaskResult(
+            taskId: task.taskId,
+            status: .completed,
+            output: output,
+            completedAt: Date(),
+            executionTime: 1.5
+        )
+    }
+    
+    /// Format error message
+    private func formatError(_ error: AgentError) -> String {
+        switch error {
+        case .notImplemented(let message):
+            return "Not implemented: \(message)"
+        case .invalidConfiguration(let detail):
+            return "Invalid configuration: \(detail)"
+        case .rateLimitExceeded:
+            return "Rate limit exceeded. Please try again later."
+        case .authenticationFailed:
+            return "Authentication failed. Please check your credentials."
+        case .capabilityNotSupported(let capability):
+            return "Capability not supported: \(capability)"
+        case .networkError(let message):
+            return "Network error: \(message)"
+        case .processingError(let message):
+            return "Processing error: \(message)"
+        case .unknownError(let message):
+            return "Unknown error: \(message)"
+        }
+    }
+}
+
+/// List available capabilities
+struct ListCapabilities: ParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "capabilities",
+        abstract: "List available AI capabilities"
+    )
+    
+    func run() {
+        print("🤖 AICollaborator Available Capabilities 🧠")
+        print("==========================================")
+        
+        // List all capabilities with descriptions
+        let capabilities: [(AICapability, String)] = [
+            (.textGeneration, "Generate natural language text from prompts"),
+            (.codeGeneration, "Generate programming code in various languages"),
+            (.imageGeneration, "Generate images from text descriptions"),
+            (.audioTranscription, "Transcribe audio to text"),
+            (.dataAnalysis, "Analyze and extract insights from data"),
+            (.textAnalysis, "Analyze text for sentiment, entities, and more"),
+            (.questionAnswering, "Answer questions based on context"),
+            (.summarization, "Summarize long text into concise summaries"),
+            (.translation, "Translate text between languages"),
+            (.planning, "Plan and organize tasks"),
+            (.reasoning, "Apply logical reasoning to problems")
+        ]
+        
+        for (capability, description) in capabilities {
+            print("• \(capability.rawValue): \(description)")
+        }
+    }
+}
+
+/// Help command
+struct Help: ParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "help",
+        abstract: "Show help information"
+    )
+    
+    func run() {
+        print("🤖 AICollaborator CLI Help 📚")
+        print("============================")
+        print("Usage:")
+        print("  ai-collaborator generate \"Your prompt here\"")
+        print("  ai-collaborator capabilities")
+        print("  ai-collaborator help")
+        print("")
+        print("Examples:")
+        print("  ai-collaborator generate \"Write a short poem about AI\"")
+        print("  ai-collaborator generate \"Explain quantum computing\" --max-tokens 1000")
+        print("  ai-collaborator generate \"Create a Swift function to sort an array\" --model codellama")
+    }
+}
+
+// MARK: - Utilities
+
+/// Simple spinner for command line
+class Spinner {
+    private var isRunning = false
+    private let spinnerChars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    private var index = 0
+    private var task: Task<Void, Never>?
+    
+    func start(message: String) {
+        isRunning = true
+        task = Task {
+            while isRunning {
+                print("\r\(spinnerChars[index]) \(message)...", terminator: "")
+                fflush(stdout)
+                index = (index + 1) % spinnerChars.count
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+    }
+    
+    func stop() {
+        isRunning = false
+        task?.cancel()
+        print("\r", terminator: "")
+        fflush(stdout)
+    }
+}
+
+/// Print error message with formatting
+func printError(_ message: String) {
+    print("❌ Error: \(message)")
+}
+
+// MARK: - Main Execution
+
+AICollaboratorCommand.main()
+
+//
+//  main.swift
+//  AICollaboratorCLI
+//
+//  Created: 2025-04-10
+//
+
+import Foundation
 import ArgumentParser
 import AICollaboratorApp
 
