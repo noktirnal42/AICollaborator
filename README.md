@@ -1,4 +1,5 @@
-# AI Collaborator
+<p align="center"><img src="Sources/Resources/assets/images/AICollaborator_logo.png" alt="AICollaborator Logo" width="300"/></p>
+<h1 align="center">AI Collaborator</h1>
 
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](https://swift.org)
 [![macOS 15+](https://img.shields.io/badge/macOS-15+-blue.svg)](https://www.apple.com/macos/)
@@ -10,7 +11,8 @@ AI Collaborator is a Swift-based framework designed to facilitate seamless colla
 
 ### Key Features
 
-- **AI Agent Integration**: Simple API for connecting various AI models
+- **Flexible AI Model Integration**: Connect to any Ollama model, with model selection and management
+- **GitHub Repository Integration**: Work with any GitHub repository, not limited to specific projects
 - **Context Preservation**: Maintains conversation and task history for improved collaboration
 - **Code Analysis**: Tools for AI agents to understand, modify, and generate code
 - **Multi-agent Orchestration**: Coordinate multiple specialized AI agents
