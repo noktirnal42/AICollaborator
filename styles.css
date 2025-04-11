@@ -1,0 +1,179 @@
+/* CSS Variables for consistent colors */
+:root {
+    --primary-color: #2563eb; /* Blue */
+    --secondary-color: #4f46e5; /* Indigo */
+    --accent-color: #8b5cf6; /* Purple */
+    --text-color: #1f2937; /* Dark Gray */
+    --light-text: #f9fafb;
+    --background-color: #ffffff;
+    --section-bg: #f3f4f6;
+    --footer-bg: #111827;
+    --border-radius: 8px;
+}
+
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    color: var(--text-color);
+    line-height: 1.6;
+    background-color: var(--background-color);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Typography */
+h1, h2, h3 {
+    margin-bottom: 1rem;
+    line-height: 1.2;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+}
+
+h2 {
+    font-size: 2rem;
+    color: var(--secondary-color);
+}
+
+p {
+    margin-bottom: 1.5rem;
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover, a:focus {
+    color: var(--accent-color);
+    text-decoration: underline;
+}
+
+/* Focus styles for accessibility */
+a:focus, button:focus {
+    outline: 3px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Header Styles */
+header {
+    padding: 2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border-bottom: 1px solid var(--section-bg);
+}
+
+nav {
+    width: 100%;
+    margin-top: 1.5rem;
+}
+
+nav ul {
+    display: flex;
+    justify-content: center;
+    list-style: none;
+}
+
+nav li {
+    margin: 0 1rem;
+}
+
+nav a {
+    font-weight: bold;
+    padding: 0.5rem;
+}
+
+/* Main Content */
+main {
+    padding: 2rem 0;
+}
+
+section {
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background-color: var(--section-bg);
+    border-radius: var(--border-radius);
+}
+
+/* Footer Styles */
+footer {
+    background-color: var(--footer-bg);
+    color: var(--light-text);
+    text-align: center;
+    padding: 2rem 0;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    margin-top: 2rem;
+}
+
+/* Media Queries for Responsiveness */
+@media (min-width: 768px) {
+    header {
+        flex-direction: row;
+        justify-content: space-between;
+        text-align: left;
+    }
+    
+    nav {
+        margin-top: 0;
+        width: auto;
+    }
+    
+    main {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+    }
+    
+    section {
+        margin-bottom: 0;
+    }
+}
+
+@media (max-width: 767px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    nav ul {
+        flex-direction: column;
+    }
+    
+    nav li {
+        margin: 0.5rem 0;
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    :root {
+        --primary-color: #0000ff;
+        --secondary-color: #000099;
+        --accent-color: #6600cc;
+        --text-color: #000000;
+        --light-text: #ffffff;
+        --background-color: #ffffff;
+        --section-bg: #eeeeee;
+        --footer-bg: #000000;
+    }
+    
+    a:focus, button:focus {
+        outline: 3px solid #000000;
+    }
+}
+
