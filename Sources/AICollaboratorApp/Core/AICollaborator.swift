@@ -9,6 +9,7 @@ import Foundation
 import SwiftyJSON
 import Alamofire
 import AsyncAlgorithms
+import NaturalLanguage
 
 /// Main entry point for AI collaboration functionality
 public actor AICollaborator {
@@ -17,6 +18,7 @@ public actor AICollaborator {
     /// Active AI agents registered with this collaborator
     private var agents: [AIAgentExchangeId: any AICollaboratorAgent] = [:]
     
+    /// Shared context for collaboration sessions
     /// Shared context for collaboration sessions
     private let context: AIContext
     
@@ -29,13 +31,35 @@ public actor AICollaborator {
     /// Authentication credentials for external services
     private var credentials: AICredentials?
     
+    /// Ollama integration service
+    private let ollamaService: OllamaService
+    
+    /// GitHub integration service
+    private let githubService: GitHubService
+    
+    /// Selected Ollama model for AI tasks
+    private(set) public var selectedModel: String?
+    
+    /// Currently active GitHub repository
+    private(set) public var activeRepository: GitHubService.Repository?
     // MARK: - Initialization
     
     /// Initialize a new AI Collaborator instance
-    /// - Parameter context: Optional pre-existing context. If nil, a new context will be created.
-    public init(context: AIContext? = nil) {
+    /// - Parameters:
+    ///   - context: Optional pre-existing context. If nil, a new context will be created.
+    ///   - ollamaBaseURL: Base URL for Ollama API, defaults to localhost
+    ///   - githubCliPath: Path to GitHub CLI executable
+    public init(
+        context: AIContext? = nil,
+        ollamaBaseURL: URL = URL(string: "http://localhost:11434")!,
+        githubCliPath: String = "/usr/local/bin/gh"
+    ) {
         self.context = context ?? AIContext()
         self.sessionId = UUID()
+        
+        // Initialize services
+        self.ollamaService = OllamaService(baseURL: ollamaBaseURL)
+        self.githubService = GitHubService(githubCliPath: githubCliPath)
         
         setupLogging()
     }
