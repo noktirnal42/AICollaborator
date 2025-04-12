@@ -661,5 +661,6 @@ class PythonBridge: ObservableObject {
                     let processedSamples = frequencyHandler.processSamples(samples)
                     
                     // Create new buffer with processed samples
+                    // Create new buffer with processed samples
+"""
                 
-

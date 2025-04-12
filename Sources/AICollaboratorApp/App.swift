@@ -435,4 +435,3 @@ struct InitializingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
-}
