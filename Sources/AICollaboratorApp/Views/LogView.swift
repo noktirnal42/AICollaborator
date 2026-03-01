@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 struct LogView: View {
@@ -167,4 +168,4 @@ struct LogEntryRow: View {
     LogView()
         .environmentObject(LogManager())
 }
-
+#endif

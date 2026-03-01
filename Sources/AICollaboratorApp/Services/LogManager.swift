@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import Foundation
 import SwiftUI
 
@@ -183,3 +184,4 @@ class LogManager: ObservableObject {
         }
     }
 }
+#endif

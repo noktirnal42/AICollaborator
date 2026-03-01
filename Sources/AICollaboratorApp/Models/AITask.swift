@@ -12,8 +12,7 @@ import Foundation
 /// `AITask` represents a discrete unit of work that can be assigned to and
 /// executed by an AI agent. Tasks contain a description, input data, and
 /// metadata about the task's requirements and state.
-@available(macOS 15.0, *)
-public struct AITask: Identifiable, Codable {
+public struct AITask: Identifiable, Codable, Sendable {
     
     // MARK: - Properties
     
@@ -140,8 +139,7 @@ public struct AITask: Identifiable, Codable {
 }
 
 /// Task input data.
-@available(macOS 15.0, *)
-public enum TaskInput: Codable, Equatable {
+public enum TaskInput: Codable, Equatable, Sendable {
     case text(String)
     case structuredData(Data)
     case fileURL(URL)
@@ -207,7 +205,7 @@ public enum TaskInput: Codable, Equatable {
 }
 
 /// Task priority levels.
-public enum TaskPriority: String, Codable, Comparable {
+public enum TaskPriority: String, Codable, Comparable, Sendable {
     case low
     case normal
     case high
@@ -220,7 +218,7 @@ public enum TaskPriority: String, Codable, Comparable {
 }
 
 /// AI agent capabilities.
-public enum AICapability: String, Codable, CaseIterable {
+public enum AICapability: String, Codable, CaseIterable, Sendable {
     case textGeneration
     case codeGeneration
     case imageGeneration
@@ -232,5 +230,7 @@ public enum AICapability: String, Codable, CaseIterable {
     case translation
     case planning
     case reasoning
+    case basicCompletion
+    case conversational
 }
 

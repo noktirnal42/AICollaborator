@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 @main
@@ -435,3 +436,4 @@ struct InitializingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+#endif
