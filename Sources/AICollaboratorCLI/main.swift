@@ -392,7 +392,7 @@ actor SimulationAgent: @preconcurrency AICollaboratorAgent {
         )
     }
 
-    func provideCapabilities() -> [AICapability] {
+    nonisolated func provideCapabilities() -> [AICapability] {
         return AICapability.allCases
     }
 }

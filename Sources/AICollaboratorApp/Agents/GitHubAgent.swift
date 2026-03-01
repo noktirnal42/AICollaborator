@@ -114,7 +114,7 @@ public actor GitHubAgent: @preconcurrency AICollaboratorAgent {
         }
     }
 
-    public func provideCapabilities() -> [AICapability] {
+    nonisolated public func provideCapabilities() -> [AICapability] {
         return [.textAnalysis, .dataAnalysis, .summarization, .planning]
     }
 

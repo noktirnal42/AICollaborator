@@ -137,7 +137,7 @@ public actor BaseAIAgent: @preconcurrency AICollaboratorAgent {
 
         state = .busy(taskId: task.taskId)
 
-        var progressMonitor = TaskProgressMonitor(
+        let progressMonitor = TaskProgressMonitor(
             taskId: task.taskId,
             expectedDuration: calculateExpectedDuration(for: task)
         )
@@ -176,7 +176,7 @@ public actor BaseAIAgent: @preconcurrency AICollaboratorAgent {
     }
 
     /// Provide the capabilities supported by this agent.
-    public func provideCapabilities() -> [AICapability] {
+    nonisolated public func provideCapabilities() -> [AICapability] {
         return agentCapabilities
     }
 

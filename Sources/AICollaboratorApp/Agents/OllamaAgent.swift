@@ -78,7 +78,7 @@ public actor OllamaAgent: @preconcurrency AICollaboratorAgent {
     private let ollamaService: OllamaService
     private var availableModels: [OllamaService.OllamaModel] = []
     private var currentModel: String?
-    private var modelFamily: ModelFamily
+    nonisolated(unsafe) private var modelFamily: ModelFamily
     private var state: AgentState = .idle
     private var responseCache: [String: (response: String, timestamp: Date)] = [:]
     private let maxCacheSize = 50
@@ -131,7 +131,7 @@ public actor OllamaAgent: @preconcurrency AICollaboratorAgent {
         }
     }
 
-    public func provideCapabilities() -> [AICapability] {
+    nonisolated public func provideCapabilities() -> [AICapability] {
         return modelFamily.defaultCapabilities
     }
 

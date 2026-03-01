@@ -73,6 +73,9 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 iOSInjectionProject/
 
+# Release build output
+build/
+
 # Environment variables
 .env
 .env.local
