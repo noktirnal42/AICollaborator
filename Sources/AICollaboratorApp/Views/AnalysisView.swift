@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 struct AnalysisView: View {
@@ -35,6 +36,7 @@ struct AnalysisView: View {
                                             isFixingIssue = true
                                             pythonBridge.generateIssueFix()
                                         }
+                                    }
                                     .buttonStyle(isFixingIssue ? .bordered : .borderedProminent)
                                 }
                                 
@@ -303,3 +305,4 @@ extension String {
         .environmentObject(PythonBridge.preview)
         .environmentObject(LogManager())
 }
+#endif

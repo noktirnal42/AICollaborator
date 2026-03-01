@@ -11,8 +11,7 @@ import Foundation
 ///
 /// `ConversationMessage` represents a single message in a conversation,
 /// containing the sender's role, content, and metadata.
-@available(macOS 15.0, *)
-public struct ConversationMessage: Codable, Identifiable, Equatable {
+public struct ConversationMessage: Codable, Identifiable, Equatable, Sendable {
     
     // MARK: - Properties
     

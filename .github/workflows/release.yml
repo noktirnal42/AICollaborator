@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.0)'
+        required: true
+        default: '0.1.0'
+
+jobs:
+  build-and-release:
+    name: Build & Package DMG
+    runs-on: macos-15
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "push" ]; then
+          VERSION="${GITHUB_REF#refs/tags/v}"
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        echo "Building version: ${VERSION}"
+
+    - name: Show environment
+      run: |
+        swift --version
+        xcodebuild -version
+        echo "macOS $(sw_vers -productVersion)"
+
+    - name: Resolve dependencies
+      run: swift package resolve
+
+    - name: Build (Release)
+      run: swift build -c release -v
+
+    - name: Run tests
+      run: swift test -v
+
+    - name: Package DMG
+      run: |
+        chmod +x scripts/package-dmg.sh
+        ./scripts/package-dmg.sh \
+          --configuration Release \
+          --version "${{ steps.version.outputs.version }}"
+
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AICollaborator-${{ steps.version.outputs.version }}
+        path: |
+          build/release/AICollaborator-${{ steps.version.outputs.version }}.dmg
+          build/release/ai-collaborator
+          build/release/AICollaborator-${{ steps.version.outputs.version }}-checksums.txt
+        retention-days: 30
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        name: AICollaborator v${{ steps.version.outputs.version }}
+        body: |
+          ## AICollaborator v${{ steps.version.outputs.version }}
+
+          ### Installation
+          1. Download `AICollaborator-${{ steps.version.outputs.version }}.dmg`
+          2. Open the DMG and drag **AICollaborator.app** to your Applications folder
+          3. Optionally copy `ai-collaborator` to `/usr/local/bin/` for CLI access
+
+          ### Requirements
+          - macOS 15.0 or later
+
+          ### Checksums
+          See `AICollaborator-${{ steps.version.outputs.version }}-checksums.txt` for SHA-256 checksums.
+        files: |
+          build/release/AICollaborator-${{ steps.version.outputs.version }}.dmg
+          build/release/ai-collaborator
+          build/release/AICollaborator-${{ steps.version.outputs.version }}-checksums.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

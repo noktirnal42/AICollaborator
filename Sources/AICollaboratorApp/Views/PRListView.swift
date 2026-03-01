@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 struct PRListView: View {
@@ -302,3 +303,4 @@ struct PRDetailView: View {
         .environmentObject(PythonBridge.preview)
         .environmentObject(LogManager())
 }
+#endif

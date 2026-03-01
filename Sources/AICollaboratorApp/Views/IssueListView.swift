@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 struct IssueListView: View {
@@ -334,3 +335,4 @@ struct IssueDetailView: View {
         .environmentObject(PythonBridge.preview)
         .environmentObject(LogManager())
 }
+#endif

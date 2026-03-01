@@ -6,49 +6,46 @@
 //
 
 import Foundation
-import Alamofire
 import AsyncAlgorithms
-import Foundation
-import NaturalLanguage
-import SwiftyJSON
-/// Main entry point for AI collaboration functionality
+
+/// Main entry point for AI collaboration functionality.
 public actor AICollaborator {
+
     // MARK: - Properties
-    
-    /// Active AI agents registered with this collaborator
+
+    /// Active AI agents registered with this collaborator.
     private var agents: [AIAgentExchangeId: any AICollaboratorAgent] = [:]
-    
-    /// Shared context for collaboration sessions
-    /// Shared context for collaboration sessions
+
+    /// Shared context for collaboration sessions.
     private let context: AIContext
-    
-    /// Task queue for managing concurrent operations
+
+    /// Task queue for managing concurrent operations.
     private let taskQueue = TaskQueue<AITask>()
-    
-    /// Current collaboration session ID
+
+    /// Current collaboration session ID.
     private let sessionId: UUID
-    
-    /// Authentication credentials for external services
+
+    /// Authentication credentials for external services.
     private var credentials: AICredentials?
-    
-    /// Ollama integration service
+
+    /// Ollama integration service.
     private let ollamaService: OllamaService
-    
-    /// GitHub integration service
+
+    /// GitHub integration service.
     private let githubService: GitHubService
-    
-    /// Selected Ollama model for AI tasks
+
+    /// Selected Ollama model for AI tasks.
     public private(set) var selectedModel: String?
-    
-    /// Currently active GitHub repository
+
+    /// Currently active GitHub repository.
     public private(set) var activeRepository: GitHubService.Repository?
+
+    /// Logger for collaborator operations.
+    private let logger = CollaboratorLogger()
+
     // MARK: - Initialization
-    
-    /// Initialize a new AI Collaborator instance
-    /// - Parameters:
-    ///   - context: Optional pre-existing context. If nil, a new context will be created.
-    ///   - ollamaBaseURL: Base URL for Ollama API, defaults to localhost
-    ///   - githubCliPath: Path to GitHub CLI executable
+
+    /// Initialize a new AI Collaborator instance.
     public init(
         context: AIContext? = nil,
         ollamaBaseURL: URL = URL(string: "http://localhost:11434")!,
@@ -56,37 +53,26 @@ public actor AICollaborator {
     ) {
         self.context = context ?? AIContext()
         self.sessionId = UUID()
-        
-        // Initialize services
         self.ollamaService = OllamaService(baseURL: ollamaBaseURL)
         self.githubService = GitHubService(githubCliPath: githubCliPath)
-        
-        setupLogging()
     }
-    
+
     // MARK: - Public Methods
-    
-    /// Connect to external AI services with the provided credentials
-    /// - Parameters:
-    ///   - agentType: Type of AI agent to connect
-    ///   - credentials: Authentication credentials for the service
-    /// - Returns: Connection result indicating success or failure
+
+    /// Connect to external AI services with the provided credentials.
     public func connect(agentType: AIAgentType, credentials: AICredentials) async -> ConnectionResult {
         self.credentials = credentials
-        
         do {
-            let result = try await validateCredentials(credentials)
-            logger.info("Successfully connected to \(agentType) service")
+            _ = try await validateCredentials(credentials)
+            logger.info("Successfully connected to \(agentType.rawValue) service")
             return .success
         } catch {
-            logger.error("Failed to connect to \(agentType) service: \(error.localizedDescription)")
+            logger.error("Failed to connect: \(error.localizedDescription)")
             return .failure(error.localizedDescription)
         }
     }
-    
-    /// Register an AI agent with this collaborator
-    /// - Parameter agent: The agent to register
-    /// - Returns: Agent exchange ID for future reference
+
+    /// Register an AI agent with this collaborator.
     @discardableResult
     public func register(agent: any AICollaboratorAgent) -> AIAgentExchangeId {
         let id = AIAgentExchangeId()
@@ -94,28 +80,18 @@ public actor AICollaborator {
         logger.info("Registered agent with capabilities: \(agent.provideCapabilities())")
         return id
     }
-    
-    /// Execute an AI task asynchronously
-    /// - Parameter task: The task to execute
-    /// - Returns: Result of the task execution
+
+    /// Execute an AI task asynchronously.
     public func execute(task: AITask) async -> AITaskResult {
         logger.info("Executing task: \(task.taskId)")
-        
-        // Record task in context
         await context.recordTask(task)
-        
+
         do {
-            // Find appropriate agent for the task
             guard let agent = findAgentForTask(task) else {
                 return AITaskResult(status: .failed, output: "No suitable agent found for task")
             }
-            
-            // Execute the task with the selected agent
             let result = try await agent.processTask(task)
-            
-            // Record the result in context
             await context.recordResult(result, for: task)
-            
             return result
         } catch {
             let result = AITaskResult(status: .failed, output: error.localizedDescription)
@@ -123,30 +99,20 @@ public actor AICollaborator {
             return result
         }
     }
-    
-    /// Retrieve the current collaboration context
-    /// - Returns: The current context
+
+    /// Retrieve the current collaboration context.
     public func getContext() -> AIContext {
         return context
     }
-    
+
     // MARK: - Private Methods
-    
-    private func setupLogging() {
-        // Configure logging system
-        logger.logLevel = .info
-    }
-    
+
     private func validateCredentials(_ credentials: AICredentials) async throws -> Bool {
-        // Simulate credential validation
         try await Task.sleep(for: .seconds(1))
-        
-        // In a real implementation, this would verify with the AI service provider
         return true
     }
-    
+
     private func findAgentForTask(_ task: AITask) -> (any AICollaboratorAgent)? {
-        // Find agent with capabilities that match the task requirements
         for (_, agent) in agents {
             let capabilities = agent.provideCapabilities()
             if task.requiredCapabilities.isSubset(of: Set(capabilities)) {
@@ -159,87 +125,38 @@ public actor AICollaborator {
 
 // MARK: - Supporting Types
 
-/// Result of a connection attempt
-public enum ConnectionResult {
+/// Result of a connection attempt.
+public enum ConnectionResult: Sendable {
     case success
     case failure(String)
 }
 
-/// Credentials for authenticating with AI services
-public struct AICredentials {
+/// Credentials for authenticating with AI services.
+public struct AICredentials: Sendable {
     public let apiKey: String
     public let additionalInfo: [String: String]
-    
+
     public init(apiKey: String, additionalInfo: [String: String] = [:]) {
         self.apiKey = apiKey
         self.additionalInfo = additionalInfo
     }
 }
 
-/// Simple logging utility
-private enum LogLevel: Int {
-    case debug = 0
-    case info = 1
-    case warning = 2
-    case error = 3
+/// Simple logging utility for AICollaborator.
+private struct CollaboratorLogger: Sendable {
+    func info(_ message: String) { print("[AICollaborator] INFO: \(message)") }
+    func error(_ message: String) { print("[AICollaborator] ERROR: \(message)") }
 }
 
-private struct Logger {
-    var logLevel: LogLevel = .info
-    
-    func debug(_ message: String) {
-        log(message, level: .debug)
-    }
-    
-    func info(_ message: String) {
-        log(message, level: .info)
-    }
-    
-    func warning(_ message: String) {
-        log(message, level: .warning)
-    }
-    
-    func error(_ message: String) {
-        log(message, level: .error)
-    }
-    
-    private func log(_ message: String, level: LogLevel) {
-        if level.rawValue >= logLevel.rawValue {
-            let prefix: String
-            switch level {
-            case .debug: prefix = "[DEBUG]"
-            case .info: prefix = "[INFO]"
-            case .warning: prefix = "[WARNING]"
-            case .error: prefix = "[ERROR]"
-            }
-            
-            print("\(prefix) \(message)")
-        }
-    }
-}
-
-private let logger = Logger()
-
-/// A queue for managing concurrent task execution
-actor TaskQueue<T> {
+/// A queue for managing concurrent task execution.
+actor TaskQueue<T: Sendable>: Sendable {
     private var tasks: [T] = []
-    
-    func enqueue(_ task: T) {
-        tasks.append(task)
-    }
-    
+
+    func enqueue(_ task: T) { tasks.append(task) }
     func dequeue() -> T? {
-        guard !tasks.isEmpty else {
-            return nil
-        }
+        guard !tasks.isEmpty else { return nil }
         return tasks.removeFirst()
     }
-    
-    var isEmpty: Bool {
-        return tasks.isEmpty
-    }
-    
-    var count: Int {
-        return tasks.count
-    }
+    var isEmpty: Bool { tasks.isEmpty }
+    var count: Int { tasks.count }
 }

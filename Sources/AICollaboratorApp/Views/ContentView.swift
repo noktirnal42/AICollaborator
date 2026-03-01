@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 struct ContentView: View {
@@ -113,4 +114,4 @@ struct StatusBar: View {
         .environmentObject(PythonBridge())
         .environmentObject(LogManager())
 }
-
+#endif

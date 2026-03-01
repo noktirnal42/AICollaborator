@@ -1,11 +1,11 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 
 import PackageDescription
 
 let package = Package(
     name: "AICollaborator",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v15)
     ],
     products: [
         .library(
@@ -19,20 +19,13 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(url: "https://github.com/Alamofire/Alamofire", from: "5.9.0"),
-        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON", from: "5.0.1"),
-        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
-        // Adding Python Integration using PythonKit instead of PythonSwiftCore
-        .package(url: "https://github.com/pvieito/PythonKit.git", from: "0.4.1")
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0")
     ],
     targets: [
         .target(
             name: "AICollaboratorApp",
             dependencies: [
-                .product(name: "Alamofire", package: "Alamofire"),
-                .product(name: "SwiftyJSON", package: "SwiftyJSON"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-                .product(name: "PythonKit", package: "PythonKit")
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ],
             path: "Sources/AICollaboratorApp"
         ),
@@ -50,5 +43,5 @@ let package = Package(
             path: "Tests/AICollaboratorTests"
         )
     ],
-    swiftLanguageVersions: [.v5]
+    swiftLanguageModes: [.v6]
 )

@@ -6,677 +6,267 @@
 //
 
 import Foundation
-import SwiftyJSON
 
 /// Specialized agent for GitHub interactions
-public actor GitHubAgent: BaseAIAgent {
+public actor GitHubAgent: @preconcurrency AICollaboratorAgent {
+
     // MARK: - Types
-    
+
     /// Types of GitHub analysis tasks
-    public enum AnalysisType {
+    public enum AnalysisType: Sendable {
         case repository
         case pullRequest
         case issue
         case codeReview
         case documentation
-        case contributionGuidelines
         case trends
         case custom(String)
-        
-        /// Get required capabilities for this analysis type
-        var requiredCapabilities: [AICapability] {
+    }
+
+    /// GitHub operation error types
+    public enum GitHubAgentError: Error, LocalizedError, Sendable {
+        case noActiveRepository
+        case operationFailed(String)
+        case invalidInput(String)
+
+        public var errorDescription: String? {
             switch self {
-            case .codeReview:
-                return [.codeGeneration, .textAnalysis]
-            case .documentation:
-                return [.textAnalysis, .dataSummarization]
-            case .repository, .pullRequest, .issue, .contributionGuidelines, .trends, .custom:
-                return [.textAnalysis]
+            case .noActiveRepository:
+                return "No active repository is set"
+            case .operationFailed(let message):
+                return "Operation failed: \(message)"
+            case .invalidInput(let message):
+                return "Invalid input: \(message)"
             }
         }
     }
-    
-    /// GitHub operation results
-    public struct OperationResult {
-        /// Success indicator
-        public let success: Bool
-        
-        /// Result message
-        public let message: String
-        
-        /// Additional data if applicable
-        public let data: Any?
-        
-        /// URL to view results (if applicable)
-        public let url: URL?
-        
-        /// Static success result
-        public static func success(_ message: String, data: Any? = nil, url: URL? = nil) -> OperationResult {
-            return OperationResult(success: true, message: message, data: data, url: url)
-        }
-        
-        /// Static failure result
-        public static func failure(_ message: String) -> OperationResult {
-            return OperationResult(success: false, message: message, data: nil, url: nil)
-        }
-    }
-    
+
     // MARK: - Properties
-    
+
     /// GitHub service for API interactions
     private let githubService: GitHubService
-    
+
     /// Currently active repository
     private var activeRepository: GitHubService.Repository?
-    
-    /// AI service for enhanced analysis
-    private var ollamaAgent: OllamaAgent?
-    
-    /// Repository analysis cache
-    private var repositoryAnalysisCache: [String: (analysis: String, timestamp: Date)] = [:]
-    
-    /// Maximum cache items
-    private let maxCacheSize = 20
-    
-    /// Cache expiration time (1 hour)
-    private let cacheExpirationSeconds: TimeInterval = 3600
-    
+
+    /// Current agent state
+    private var state: AgentState = .idle
+
     // MARK: - Initialization
-    
+
     /// Initialize a GitHub agent
     /// - Parameters:
     ///   - githubService: GitHub service instance
-    ///   - ollamaAgent: Optional Ollama agent for AI-powered analysis
     ///   - initialRepository: Initial repository to work with
     public init(
-        githubService: GitHubService,
-        ollamaAgent: OllamaAgent? = nil,
+        githubService: GitHubService = GitHubService(),
         initialRepository: GitHubService.Repository? = nil
     ) {
         self.githubService = githubService
-        self.ollamaAgent = ollamaAgent
         self.activeRepository = initialRepository
-        
-        // Define GitHub-specific capabilities
-        let capabilities: [AICapability] = [
-            .textAnalysis,
-            .dataSummarization,
-            .contextRetrieval
-        ]
-        
-        super.init(
-            name: "GitHubAgent",
-            version: "1.0",
-            description: "Specialized agent for GitHub repository management and analysis",
-            capabilities: capabilities
-        )
     }
-    
+
+    // MARK: - AICollaboratorAgent Protocol
+
+    public func processTask(_ task: AITask) async throws -> AITaskResult {
+        state = .busy(taskId: task.taskId)
+        defer { state = .idle }
+
+        // Determine what kind of GitHub task this is based on query keywords
+        let query = task.query.lowercased()
+
+        do {
+            let response: String
+            if query.contains("list issue") || query.contains("show issue") {
+                let issues = try await listIssues()
+                response = formatIssueList(issues)
+            } else if query.contains("list pr") || query.contains("list pull") {
+                let prs = try await listPullRequests()
+                response = formatPRList(prs)
+            } else if query.contains("repo") || query.contains("repository") {
+                if let repo = activeRepository {
+                    response = formatRepositoryInfo(repo)
+                } else {
+                    response = "No active repository set. Use setActiveRepository() first."
+                }
+            } else {
+                response = """
+                GitHub Agent is ready. I can help with:
+                - Listing issues (include 'list issues' in your query)
+                - Listing pull requests (include 'list PRs' or 'list pull requests')
+                - Repository information (include 'repository' or 'repo')
+                
+                Active repository: \(activeRepository.map { $0.fullName } ?? "None")
+                """
+            }
+
+            return AITaskResult(
+                taskId: task.taskId,
+                status: .completed,
+                output: response
+            )
+        } catch {
+            return AITaskResult(
+                taskId: task.taskId,
+                status: .failed,
+                output: error.localizedDescription
+            )
+        }
+    }
+
+    nonisolated public func provideCapabilities() -> [AICapability] {
+        return [.textAnalysis, .dataAnalysis, .summarization, .planning]
+    }
+
+    public func getState() -> AgentState {
+        return state
+    }
+
+    public func initialize(with config: AgentConfiguration) async -> AgentInitResult {
+        state = .idle
+        return .success
+    }
+
+    public func shutdown() async -> Result<Void, Error> {
+        state = .terminated
+        return .success(())
+    }
+
     // MARK: - Repository Management
-    
-    /// Search for GitHub repositories
-    /// - Parameters:
-    ///   - query: Search query
-    ///   - limit: Maximum results to return
-    /// - Returns: Matching repositories
-    public func searchRepositories(query: String, limit: Int = 10) async throws -> [GitHubService.Repository] {
-        return try await githubService.searchRepositories(query: query, limit: limit)
-    }
-    
+
     /// Set the active repository
-    /// - Parameter repository: Repository to set as active
     public func setActiveRepository(_ repository: GitHubService.Repository) async {
         self.activeRepository = repository
         await githubService.setActiveRepository(repository)
     }
-    
+
+    /// Search for GitHub repositories
+    public func searchRepositories(query: String, limit: Int = 10) async throws -> [GitHubService.Repository] {
+        return try await githubService.searchRepositories(query: query, limit: limit)
+    }
+
     /// Clone the active repository
-    /// - Parameter options: Clone options
-    /// - Returns: Path to cloned repository
     public func cloneActiveRepository(options: GitHubService.CloneOptions = .default) async throws -> String {
         guard let repository = activeRepository else {
             throw GitHubAgentError.noActiveRepository
         }
-        
         return try await githubService.cloneRepository(repository, options: options)
     }
-    
+
     /// Get repository details
-    /// - Parameter fullName: Repository full name (owner/name)
-    /// - Returns: Repository details
     public func getRepositoryDetails(fullName: String) async throws -> GitHubService.Repository {
         let repo = try await githubService.getRepositoryDetails(repoFullName: fullName)
-        
-        // Update active repository
         self.activeRepository = repo
         await githubService.setActiveRepository(repo)
-        
         return repo
     }
-    
+
     // MARK: - Issue Management
-    
+
     /// List issues in the active repository
-    /// - Parameters:
-    ///   - state: Issue state filter
-    ///   - limit: Maximum issues to return
-    /// - Returns: Array of issues
-    public func listIssues(state: GitHubService.IssueState = .open, limit: Int = 30) async throws -> [GitHubService.Issue] {
+    public func listIssues(
+        state issueState: GitHubService.IssueState = .open,
+        limit: Int = 30
+    ) async throws -> [GitHubService.Issue] {
         guard let repository = activeRepository else {
             throw GitHubAgentError.noActiveRepository
         }
-        
-        return try await githubService.listIssues(repository: repository, state: state, limit: limit)
+        return try await githubService.listIssues(repository: repository, state: issueState, limit: limit)
     }
-    
-    /// Create a new issue
-    /// - Parameters:
-    ///   - title: Issue title
-    ///   - body: Issue description
-    ///   - labels: Labels to apply
-    /// - Returns: Operation result
-    public func createIssue(title: String, body: String, labels: [String] = []) async throws -> OperationResult {
-        guard let repository = activeRepository else {
-            throw GitHubAgentError.noActiveRepository
-        }
-        
-        do {
-            let command = ["issue", "create", 
-                          "--repo", repository.fullName,
-                          "--title", title,
-                          "--body", body]
-            
-            // Add labels if provided
-            let finalCommand = labels.isEmpty ? command : command + ["--label", labels.joined(separator: ",")]
-            
-            let (output, exitCode) = try await githubService.runCommand(finalCommand)
-            
-            if exitCode == 0 {
-                // Extract issue URL from output
-                // Example output: "https://github.com/owner/repo/issues/123"
-                if let url = extractURL(from: output) {
-                    return OperationResult.success("Issue created successfully", url: url)
-                } else {
-                    return OperationResult.success("Issue created successfully")
-                }
-            } else {
-                return OperationResult.failure("Failed to create issue: \(output)")
-            }
-        } catch {
-            return OperationResult.failure("Error creating issue: \(error.localizedDescription)")
-        }
-    }
-    
-    /// Get issue details
-    /// - Parameter issueNumber: Issue number
-    /// - Returns: Issue details and operation result
-    public func getIssueDetails(issueNumber: Int) async throws -> (issue: GitHubService.Issue?, result: OperationResult) {
-        guard let repository = activeRepository else {
-            throw GitHubAgentError.noActiveRepository
-        }
-        
-        do {
-            let command = ["issue", "view", 
-                          String(issueNumber),
-                          "--repo", repository.fullName,
-                          "--json", "number,title,body,state,author,assignees,labels,createdAt,updatedAt,closedAt"]
-            
-            let (output, exitCode) = try await githubService.runCommand(command)
-            
-            if exitCode == 0 {
-                do {
-                    // Parse JSON output into Issue struct
-                    let json = try JSON(data: output.data(using: .utf8)!)
-                    
-                    // Build issue from JSON (simplified example)
-                    // In a real implementation, this would parse all fields properly
-                    let issue = GitHubService.Issue(
-                        number: json["number"].intValue,
-                        title: json["title"].stringValue,
-                        body: json["body"].string,
-                        state: GitHubService.IssueState(rawValue: json["state"].stringValue) ?? .open,
-                        creator: json["author"]["login"].stringValue,
-                        assignees: json["assignees"].arrayValue.map { $0["login"].stringValue },
-                        labels: json["labels"].arrayValue.map { $0["name"].stringValue },
-                        createdAt: ISO8601DateFormatter().date(from: json["createdAt"].stringValue) ?? Date(),
-                        updatedAt: ISO8601DateFormatter().date(from: json["updatedAt"].stringValue) ?? Date(),
-                        closedAt: ISO8601DateFormatter().date(from: json["closedAt"].stringValue),
-                        repository: repository
-                    )
-                    
-                    return (issue, OperationResult.success("Retrieved issue details successfully"))
-                } catch {
-                    return (nil, OperationResult.failure("Failed to parse issue details: \(error.localizedDescription)"))
-                }
-            } else {
-                return (nil, OperationResult.failure("Failed to retrieve issue: \(output)"))
-            }
-        } catch {
-            return (nil, OperationResult.failure("Error retrieving issue: \(error.localizedDescription)"))
-        }
-    }
-    
+
     // MARK: - Pull Request Management
-    
-    /// Create a pull request
-    /// - Parameters:
-    ///   - title: PR title
-    ///   - body: PR description
-    ///   - head: Head branch
-    ///   - base: Base branch
-    /// - Returns: Operation result
-    public func createPullRequest(title: String, body: String, head: String, base: String) async throws -> OperationResult {
+
+    /// List pull requests in the active repository
+    public func listPullRequests(
+        state prState: GitHubService.PRState = .open,
+        limit: Int = 30
+    ) async throws -> [GitHubService.PullRequest] {
         guard let repository = activeRepository else {
             throw GitHubAgentError.noActiveRepository
         }
-        
+        return try await githubService.listPullRequests(repository: repository, state: prState, limit: limit)
+    }
+
+    // MARK: - Analysis
+
+    /// Analyze a repository
+    public func analyzeRepository(
+        _ repository: GitHubService.Repository,
+        type: AnalysisType = .repository
+    ) async -> String {
+        var analysis = "# Repository Analysis: \(repository.fullName)\n\n"
+        analysis += "- **URL:** \(repository.webUrl)\n"
+        analysis += "- **Default Branch:** \(repository.defaultBranch)\n"
+        analysis += "- **Private:** \(repository.isPrivate ? "Yes" : "No")\n"
+        analysis += "- **Has Issues:** \(repository.hasIssues ? "Yes" : "No")\n"
+        analysis += "- **Fork:** \(repository.isFork ? "Yes" : "No")\n"
+        if let desc = repository.description {
+            analysis += "- **Description:** \(desc)\n"
+        }
+
         do {
-            let command = ["pr", "create", 
-                          "--repo", repository.fullName,
-                          "--title", title,
-                          "--body", body,
-                          "--head", head,
-                          "--base", base]
-            
-            let (output, exitCode) = try await githubService.runCommand(command)
-            
-            if exitCode == 0 {
-                // Extract PR URL from output
-                if let url = extractURL(from: output) {
-                    return OperationResult.success("Pull request created successfully", url: url)
-                } else {
-                    return OperationResult.success("Pull request created successfully")
-                }
+            let issues = try await githubService.listIssues(repository: repository, limit: 10)
+            analysis += "\n## Open Issues (showing up to 10)\n\n"
+            if issues.isEmpty {
+                analysis += "No open issues.\n"
             } else {
-                return OperationResult.failure("Failed to create pull request: \(output)")
+                for issue in issues {
+                    analysis += "- **#\(issue.number):** \(issue.title) (by \(issue.creator))\n"
+                }
             }
         } catch {
-            return OperationResult.failure("Error creating pull request: \(error.localizedDescription)")
+            analysis += "\n## Issues\n\nCould not fetch issues: \(error.localizedDescription)\n"
         }
-    }
-    
-    /// Review a pull request
-    /// - Parameters:
-    ///   - prNumber: PR number
-    ///   - comment: Review comment
-    ///   - action: Review action (approve, comment, request-changes)
-    /// - Returns: Operation result
-    public func reviewPullRequest(prNumber: Int, comment: String, action: String = "comment") async throws -> OperationResult {
-        guard let repository = activeRepository else {
-            throw GitHubAgentError.noActiveRepository
-        }
-        
+
         do {
-            let command = ["pr", "review", 
-                          String(prNumber),
-                          "--repo", repository.fullName,
-                          "--body", comment,
-                          "--\(action)"]
-            
-            let (output, exitCode) = try await githubService.runCommand(command)
-            
-            if exitCode == 0 {
-                return OperationResult.success("Pull request reviewed successfully")
+            let prs = try await githubService.listPullRequests(repository: repository, limit: 10)
+            analysis += "\n## Open Pull Requests (showing up to 10)\n\n"
+            if prs.isEmpty {
+                analysis += "No open pull requests.\n"
             } else {
-                return OperationResult.failure("Failed to review pull request: \(output)")
+                for pr in prs {
+                    analysis += "- **#\(pr.number):** \(pr.title) (by \(pr.creator))\n"
+                }
             }
         } catch {
-            return OperationResult.failure("Error reviewing pull request: \(error.localizedDescription)")
+            analysis += "\n## Pull Requests\n\nCould not fetch PRs: \(error.localizedDescription)\n"
         }
-    }
-    
-    // MARK: - Analysis Capabilities
-    
-    /// Analyze repository with AI-powered insights
-    /// - Parameter analysisType: Type of analysis to perform
-    /// - Returns: Analysis result
-    public func analyzeRepository(analysisType: AnalysisType = .repository) async throws -> String {
-        guard let repository = activeRepository else {
-            throw GitHubAgentError.noActiveRepository
-        }
-        
-        // Check cache for recent analysis
-        let cacheKey = "\(repository.fullName)|\(String(describing: analysisType))"
-        if let cached = repositoryAnalysisCache[cacheKey], 
-           Date().timeIntervalSince(cached.timestamp) < cacheExpirationSeconds {
-            // Return cached analysis
-            return cached.analysis
-        }
-        
-        // Generate base analysis from repository data
-        var baseAnalysis = ""
-        
-        switch analysisType {
-        case .repository:
-            baseAnalysis = await generateRepositoryOverview(repository)
-        case .pullRequest:
-            baseAnalysis = await generatePullRequestsAnalysis(repository)
-        case .issue:
-            baseAnalysis = await generateIssuesAnalysis(repository)
-        case .codeReview:
-            baseAnalysis = await generateCodeReviewAnalysis(repository)
-        case .documentation:
-            baseAnalysis = await generateDocumentationAnalysis(repository)
-        case .contributionGuidelines:
-            baseAnalysis = await generateContributionGuidelinesAnalysis(repository)
-        case .trends:
-            baseAnalysis = await generateRepositoryTrendsAnalysis(repository)
-        case .custom(let customType):
-            baseAnalysis = await generateCustomAnalysis(repository, type: customType)
-        }
-        
-        // Enhance with AI if available
-        var enhancedAnalysis = baseAnalysis
-        if let ollamaAgent = ollamaAgent {
-            // Prepare task
-            let task = AITask(
-                description: "Enhance GitHub repository analysis",
-                query: "Based on the following raw GitHub repository analysis, provide enhanced insights, suggestions, and patterns:\n\n\(baseAnalysis)",
-                context: ["repositoryName": repository.fullName],
-                requiredCapabilities: [.textAnalysis, .dataSummarization],
-                priority: .normal
-            )
-            
-            do {
-                // Process through AI
-                let result = try await ollamaAgent.processTask(task)
-                
-                // Use AI-enhanced analysis if successful
-                if result.status == .completed, let output = result.output as? String {
-                    enhancedAnalysis = output
-                }
-            } catch {
-                // If AI processing fails, fall back to base analysis
-                logger.warning("AI enhancement failed: \(error.localizedDescription). Using base analysis.")
-            }
-        }
-        
-        // Cache the result
-        repositoryAnalysisCache[cacheKey] = (analysis: enhancedAnalysis, timestamp: Date())
-        
-        // Prune cache if needed
-        if repositoryAnalysisCache.count > maxCacheSize {
-            // Remove oldest entries
-            let sortedKeys = repositoryAnalysisCache.keys.sorted { lhs, rhs in
-                return repositoryAnalysisCache[lhs]!.timestamp < repositoryAnalysisCache[rhs]!.timestamp
-            }
-            
-            // Remove oldest entries
-            let keysToRemove = sortedKeys.prefix(repositoryAnalysisCache.count - maxCacheSize)
-            for key in keysToRemove {
-                repositoryAnalysisCache.removeValue(forKey: key)
-            }
-        }
-        
-        return enhancedAnalysis
-    }
-    
-    // MARK: - Analysis Generators
-    
-    /// Generate a repository overview analysis
-    /// - Parameter repository: Repository to analyze
-    /// - Returns: Analysis text
-    private func generateRepositoryOverview(_ repository: GitHubService.Repository) async -> String {
-        var overview = "# Repository Overview: \(repository.fullName)\n\n"
-        
-        do {
-            // Get basic repository info
-            let command = ["repo", "view", repository.fullName, "--json", "description,homepageUrl,createdAt,updatedAt,pushedAt,isArchived,stargazerCount,forkCount,watcherCount,issuesCount,openIssuesCount,topics,languages,licenseInfo"]
-            
-            let (output, exitCode) = try await githubService.runCommand(command)
-            
-            if exitCode == 0, let data = output.data(using: .utf8) {
-                let json = try JSON(data: data)
-                
-                // Add repository description
-                overview += "## Description\n\n"
-                let description = json["description"].stringValue
-                overview += description.isEmpty ? "No description provided.\n\n" : "\(description)\n\n"
-                
-                // Add repository stats
-                overview += "## Repository Statistics\n\n"
-                overview += "- **Stars:** \(json["stargazerCount"].intValue)\n"
-                overview += "- **Forks:** \(json["forkCount"].intValue)\n"
-                overview += "- **Watchers:** \(json["watcherCount"].intValue)\n"
-                overview += "- **Total Issues:** \(json["issuesCount"].intValue)\n"
-                overview += "- **Open Issues:** \(json["openIssuesCount"].intValue)\n"
-                
-                // Creation and update dates
-                let createdAt = formatDate(json["createdAt"].stringValue)
-                let updatedAt = formatDate(json["updatedAt"].stringValue)
-                let pushedAt = formatDate(json["pushedAt"].stringValue)
-                
-                overview += "- **Created:** \(createdAt)\n"
-                overview += "- **Last Updated:** \(updatedAt)\n"
-                overview += "- **Last Push:** \(pushedAt)\n"
-                
-                // Add repository status
-                if json["isArchived"].boolValue {
-                    overview += "- **Status:** Archived ⚠️\n\n"
-                } else {
-                    overview += "- **Status:** Active ✅\n\n"
-                }
-                
-                // Add topics
-                overview += "## Topics\n\n"
-                let topics = json["topics"].arrayValue.map { $0.stringValue }
-                if topics.isEmpty {
-                    overview += "No topics defined.\n\n"
-                } else {
-                    for topic in topics {
-                        overview += "- \(topic)\n"
-                    }
-                    overview += "\n"
-                }
-                
-                // Add languages
-                overview += "## Languages\n\n"
-                let languages = json["languages"].dictionaryValue
-                if languages.isEmpty {
-                    overview += "No language information available.\n\n"
-                } else {
-                    let sortedLanguages = languages.sorted { $0.value.intValue > $1.value.intValue }
-                    for (language, bytes) in sortedLanguages {
-                        overview += "- **\(language):** \(formatBytes(bytes.intValue))\n"
-                    }
-                    overview += "\n"
-                }
-                
-                // Add license information
-                overview += "## License\n\n"
-                if let license = json["licenseInfo"]["name"].string {
-                    overview += "Licensed under \(license)\n\n"
-                } else {
-                    overview += "No license information available.\n\n"
-                }
-                
-                // Add repository URLs
-                overview += "## Links\n\n"
-                overview += "- **Repository:** \(repository.webUrl)\n"
-                if let homepage = json["homepageUrl"].string, !homepage.isEmpty {
-                    overview += "- **Homepage:** \(homepage)\n"
-                }
-                overview += "- **Clone URL (SSH):** \(repository.sshUrl)\n"
-                overview += "- **Clone URL (HTTPS):** \(repository.httpsUrl)\n\n"
-                
-            } else {
-                overview += "Unable to fetch detailed repository information.\n\n"
-            }
-            
-            // Add default branch information
-            overview += "## Default Branch\n\n"
-            overview += "The default branch is `\(repository.defaultBranch)`.\n\n"
-            
-        } catch {
-            overview += "Error retrieving repository information: \(error.localizedDescription)\n\n"
-        }
-        
-        return overview
-    }
-    
-    /// Generate a pull requests analysis
-    /// - Parameter repository: Repository to analyze
-    /// - Returns: Analysis text
-    private func generatePullRequestsAnalysis(_ repository: GitHubService.Repository) async -> String {
-        var analysis = "# Pull Request Analysis: \(repository.fullName)\n\n"
-        
-        do {
-            // Get open pull requests
-            let openCommand = ["pr", "list", "--repo", repository.fullName, "--state", "open", "--json", "number,title,createdAt,author,additions,deletions,changedFiles"]
-            
-            let (openOutput, openExitCode) = try await githubService.runCommand(openCommand)
-            
-            if openExitCode == 0, let openData = openOutput.data(using: .utf8) {
-                let openPRs = try JSON(data: openData)
-                
-                analysis += "## Open Pull Requests\n\n"
-                
-                if openPRs.arrayValue.isEmpty {
-                    analysis += "No open pull requests found.\n\n"
-                } else {
-                    analysis += "Found \(openPRs.arrayValue.count) open pull requests.\n\n"
-                    
-                    for pr in openPRs.arrayValue {
-                        let number = pr["number"].intValue
-                        let title = pr["title"].stringValue
-                        let author = pr["author"]["login"].stringValue
-                        let createdAt = formatDate(pr["createdAt"].stringValue)
-                        let additions = pr["additions"].intValue
-                        let deletions = pr["deletions"].intValue
-                        let changedFiles = pr["changedFiles"].intValue
-                        
-                        analysis += "### PR #\(number): \(title)\n\n"
-                        analysis += "- **Author:** \(author)\n"
-                        analysis += "- **Created:** \(createdAt)\n"
-                        analysis += "- **Changes:** +\(additions) / -\(deletions) in \(changedFiles) files\n"
-                        analysis += "- **URL:** \(repository.webUrl)/pull/\(number)\n\n"
-                    }
-                }
-                
-                // Get recently closed PRs
-                let closedCommand = ["pr", "list", "--repo", repository.fullName, "--state", "closed", "--limit", "5", "--json", "number,title,closedAt,author,merged"]
-                
-                let (closedOutput, closedExitCode) = try await githubService.runCommand(closedCommand)
-                
-                if closedExitCode == 0, let closedData = closedOutput.data(using: .utf8) {
-                    let closedPRs = try JSON(data: closedData)
-                    
-                    analysis += "## Recently Closed Pull Requests\n\n"
-                    
-                    if closedPRs.arrayValue.isEmpty {
-                        analysis += "No recently closed pull requests found.\n\n"
-                    } else {
-                        for pr in closedPRs.arrayValue {
-                            let number = pr["number"].intValue
-                            let title = pr["title"].stringValue
-                            let author = pr["author"]["login"].stringValue
-                            let closedAt = formatDate(pr["closedAt"].stringValue)
-                            let merged = pr["merged"].boolValue
-                            
-                            analysis += "### PR #\(number): \(title)\n\n"
-                            analysis += "- **Author:** \(author)\n"
-                            analysis += "- **Closed:** \(closedAt)\n"
-                            analysis += "- **Status:** \(merged ? "Merged ✅" : "Closed without merging ❌")\n"
-                            analysis += "- **URL:** \(repository.webUrl)/pull/\(number)\n\n"
-                        }
-                    }
-                }
-            } else {
-                analysis += "Unable to fetch pull request information.\n\n"
-            }
-        } catch {
-            analysis += "Error retrieving pull request information: \(error.localizedDescription)\n\n"
-        }
-        
+
         return analysis
     }
-    
-    /// Generate an issues analysis
-    /// - Parameter repository: Repository to analyze
-    /// - Returns: Analysis text
-    private func generateIssuesAnalysis(_ repository: GitHubService.Repository) async -> String {
-        var analysis = "# Issues Analysis: \(repository.fullName)\n\n"
-        
-        do {
-            // Get open issues
-            let openCommand = ["issue", "list", "--repo", repository.fullName, "--state", "open", "--json", "number,title,createdAt,author,labels,assignees,comments"]
-            
-            let (openOutput, openExitCode) = try await githubService.runCommand(openCommand)
-            
-            if openExitCode == 0, let openData = openOutput.data(using: .utf8) {
-                let openIssues = try JSON(data: openData)
-                
-                analysis += "## Open Issues\n\n"
-                
-                if openIssues.arrayValue.isEmpty {
-                    analysis += "No open issues found.\n\n"
-                } else {
-                    analysis += "Found \(openIssues.arrayValue.count) open issues.\n\n"
-                    
-                    // Group issues by labels
-                    var issuesByLabel: [String: [JSON]] = [:]
-                    
-                    for issue in openIssues.arrayValue {
-                        let labels = issue["labels"].arrayValue.map { $0["name"].stringValue }
-                        
-                        if labels.isEmpty {
-                            let unlabeled = issuesByLabel["unlabeled"] ?? []
-                            issuesByLabel["unlabeled"] = unlabeled + [issue]
-                        } else {
-                            for label in labels {
-                                var labelIssues = issuesByLabel[label] ?? []
-                                labelIssues.append(issue)
-                                issuesByLabel[label] = labelIssues
-                            }
-                        }
-                    }
-                    
-                    // Display issues by label
-                    for (label, issues) in issuesByLabel.sorted(by: { $0.key < $1.key }) {
-                        analysis += "### \(label) (\(issues.count))\n\n"
-                        
-                        for issue in issues {
-                            let number = issue["number"].intValue
-                            let title = issue["title"].stringValue
-                            let author = issue["author"]["login"].stringValue
-                            let createdAt = formatDate(issue["createdAt"].stringValue)
-                            let comments = issue["comments"].intValue
-                            
-                            analysis += "- **#\(number):** \(title)\n"
-                            analysis += "  - **Author:** \(author)\n"
-                            analysis += "  - **Created:** \(createdAt)\n"
-                            analysis += "  - **Comments:** \(comments)\n"
-                            analysis += "  - **URL:** \(repository.webUrl)/issues/\(number)\n\n"
-                        }
-                    }
-                    
-                    // Issue age statistics
-                    let now = Date()
-                    let ageGroups = [7, 30, 90, 365]
-                    var ageCounts = [Int: Int]()
-                    
-                    for issue in openIssues.arrayValue {
-                        if let createdDate = ISO8601DateFormatter().date(from: issue["createdAt"].stringValue) {
-                            let daysSinceCreation = Int(now.timeIntervalSince(createdDate) / 86400)
-                            
-                            var placed = false
-                            for group in ageGroups {
-                                if daysSinceCreation <= group && !placed {
-                                    ageCounts[group] = (ageCounts[group] ?? 0) + 1
-                                    placed = true
-                                }
-                            }
-                            
-                            if !placed {
-                                ageCounts[999] = (ageCounts[999] ?? 0) + 1
-                            }
-                        }
-                    }
-                    
-                    analysis += "### Issue Age Analysis\n\n"
-                    analysis += "- **Less than 7 days old:** \(ageCounts[7] ?? 0)\n"
-                    analysis += "- **7-30 days old:** \(ageCounts[30] ?? 0)\n"
-                    analysis += "- **30-90 days old:** \(ageCounts[90] ?? 0)\n"
-                    analysis += "- **90-365 days old:** \(ageCounts[365] ?? 0)\n"
-                    analysis += "- **More than 365 days old:** \(ageCounts[999] ?? 0)\n\n"
-                }
+
+    // MARK: - Private Helpers
+
+    private func formatIssueList(_ issues: [GitHubService.Issue]) -> String {
+        if issues.isEmpty { return "No issues found." }
+        var output = "## Open Issues\n\n"
+        for issue in issues {
+            output += "- **#\(issue.number):** \(issue.title)\n"
+            output += "  - Author: \(issue.creator)\n"
+            output += "  - Labels: \(issue.labels.isEmpty ? "none" : issue.labels.joined(separator: ", "))\n"
+            output += "  - URL: \(issue.webUrl)\n\n"
+        }
+        return output
+    }
+
+    private func formatPRList(_ prs: [GitHubService.PullRequest]) -> String {
+        if prs.isEmpty { return "No pull requests found." }
+        var output = "## Open Pull Requests\n\n"
+        for pr in prs {
+            output += "- **#\(pr.number):** \(pr.title)\n"
+            output += "  - Author: \(pr.creator)\n"
+            output += "  - Branch: \(pr.sourceBranch) → \(pr.targetBranch)\n"
+            output += "  - URL: \(pr.webUrl)\n\n"
+        }
+        return output
+    }
+
+    private func formatRepositoryInfo(_ repo: GitHubService.Repository) -> String {
+        var output = "## Repository: \(repo.fullName)\n\n"
+        output += "- **URL:** \(repo.webUrl)\n"
+        output += "- **Default Branch:** \(repo.defaultBranch)\n"
+        output += "- **Private:** \(repo.isPrivate ? "Yes" : "No")\n"
+        if let desc = repo.description { output += "- **Description:** \(desc)\n" }
+        return output
+    }
+}
